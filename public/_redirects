@@ -1,1 +1,2 @@
-/*    /index.html   200
+# No _redirects needed — SPA routing is handled by wrangler.jsonc
+# "not_found_handling": "single-page-application"
