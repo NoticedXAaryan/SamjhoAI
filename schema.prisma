@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String        @id @default(uuid())
+  email          String        @unique
+  name           String
+  passwordHash   String
+  preferences    Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  hostedMeetings Meeting[]     @relation("MeetingHost")
+  participations Participant[]
+
+  @@map("users")
+}
+
+model Meeting {
+  id               String        @id @default(uuid())
+  title            String
+  status           MeetingStatus @default(SCHEDULED)
+  scheduledStartAt DateTime
+  scheduledEndAt   DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  hostId           String
+  host             User          @relation("MeetingHost", fields: [hostId], references: [id], onDelete: Restrict)
+  participants     Participant[]
+
+  @@index([hostId])
+  @@index([status, scheduledStartAt])
+  @@map("meetings")
+}
+
+model Participant {
+  id             String          @id @default(uuid())
+  userId         String
+  meetingId      String
+  role           ParticipantRole @default(GUEST)
+  joinedAt       DateTime?
+  leftAt         DateTime?
+  createdAt      DateTime        @default(now())
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meeting        Meeting         @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, meetingId])
+  @@index([meetingId])
+  @@index([userId])
+  @@map("participants")
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ParticipantRole {
+  HOST
+  CO_HOST
+  GUEST
+  INTERPRETER
+}

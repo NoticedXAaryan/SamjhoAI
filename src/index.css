@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@theme {
+  --color-obsidian: #000000;
+  --color-glass: rgba(255, 255, 255, 0.05);
+  --color-glass-border: rgba(255, 255, 255, 0.1);
+  --color-cyan-glow: #00FFFF;
+  --color-magenta: #FF00FF;
+  --color-deep-purple: #6A00FF;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "San Francisco", "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-black text-white font-sans antialiased overflow-x-hidden;
+    background-color: #000000;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-white/5 border border-white/10 backdrop-blur-3xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),_0_4px_30px_rgba(0,0,0,0.5)];
+  }
+  
+  .text-gradient-cyan {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-cyan-glow to-blue-500;
+  }
+  
+  .text-gradient-magenta {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-magenta to-deep-purple;
+  }
+}
