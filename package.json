@@ -7,7 +7,7 @@
     "dev": "tsx server.ts",
     "dev:frontend": "vite",
     "dev:backend": "tsx watch src/backend/index.ts",
-    "start": "node dist/server.cjs",
+    "start": "NODE_ENV=production node dist/server.cjs",
     "build": "vite build && tsc server.ts --outDir dist --module CommonJS --esModuleInterop --skipLibCheck --target ES2022 && mv dist/server.js dist/server.cjs",
     "build:frontend": "vite build",
     "build:backend": "tsc -p tsconfig.backend.json",

@@ -71,3 +71,16 @@ enum ParticipantRole {
   GUEST
   INTERPRETER
 }
+
+model Message {
+  id        String   @id @default(uuid())
+  meetingId String
+  senderId  String
+  senderName String
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([meetingId])
+  @@map("messages")
+}
+

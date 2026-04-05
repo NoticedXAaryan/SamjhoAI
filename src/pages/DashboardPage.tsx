@@ -1,15 +1,9 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Video, Calendar, Keyboard, Clock, Settings, LogOut, Link as LinkIcon, Copy, Check, X, Plus, ArrowLeft, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { Video, Calendar, Keyboard, Clock, Settings, LogOut, Link as LinkIcon, Copy, Check, X, Plus, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, format, isSameMonth, isSameDay, addMonths, subMonths, parseISO } from 'date-fns';
-
-interface Meeting {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-}
+import { meetingsApi, authApi, auth, type Meeting } from '../lib/api';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -39,35 +33,41 @@ export default function DashboardPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const generateId = () => Math.random().toString(36).substring(2, 12);
+  // Load meetings from the real API on mount
+  useEffect(() => {
+    if (!auth.isLoggedIn()) {
+      navigate('/auth');
+      return;
+    }
+    meetingsApi.list().then(setUpcomingMeetings).catch(console.error);
+  }, [navigate]);
 
   const handleNewMeeting = async () => {
-    const id = generateId();
     try {
-      await fetch('/api/meetings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, title: 'Instant Meeting', date: new Date().toISOString().split('T')[0], time: new Date().toTimeString().substring(0, 5) })
+      const meeting = await meetingsApi.create({
+        title: 'Instant Meeting',
+        date: new Date().toISOString().split('T')[0],
+        time: new Date().toTimeString().substring(0, 5),
       });
-    } catch (e) {
-      console.error(e);
+      navigate(`/meeting?id=${meeting.id}`);
+    } catch {
+      navigate(`/meeting?id=${Math.random().toString(36).substring(2, 12)}`);
     }
-    navigate(`/meeting?id=${id}`);
   };
 
   const handleCreateLink = async () => {
-    const id = generateId();
     try {
-      await fetch('/api/meetings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, title: 'Generated Link Meeting', date: new Date().toISOString().split('T')[0], time: new Date().toTimeString().substring(0, 5) })
+      const meeting = await meetingsApi.create({
+        title: 'Shared Meeting Link',
+        date: new Date().toISOString().split('T')[0],
+        time: new Date().toTimeString().substring(0, 5),
       });
-    } catch (e) {
-      console.error(e);
+      const link = `${window.location.origin}/meeting?id=${meeting.id}`;
+      setGeneratedLink(link);
+    } catch {
+      const id = Math.random().toString(36).substring(2, 12);
+      setGeneratedLink(`${window.location.origin}/meeting?id=${id}`);
     }
-    const link = `${window.location.origin}/meeting?id=${id}`;
-    setGeneratedLink(link);
     setIsLinkModalOpen(true);
     setCopied(false);
   };
@@ -82,31 +82,16 @@ export default function DashboardPage() {
     e.preventDefault();
     if (!scheduleTitle || !scheduleDate || !scheduleTime) return;
 
-    const newId = generateId();
-    const newMeeting: Meeting = {
-      id: newId,
-      title: scheduleTitle,
-      date: scheduleDate,
-      time: scheduleTime,
-    };
-
     try {
-      await fetch('/api/meetings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newMeeting)
-      });
-    } catch (e) {
-      console.error(e);
+      const meeting = await meetingsApi.create({ title: scheduleTitle, date: scheduleDate, time: scheduleTime });
+      setUpcomingMeetings(prev => [...prev, meeting].sort((a, b) =>
+        new Date(a.scheduledStartAt).getTime() - new Date(b.scheduledStartAt).getTime()
+      ));
+      setScheduledLink(`${window.location.origin}/meeting?id=${meeting.id}`);
+    } catch {
+      const id = Math.random().toString(36).substring(2, 12);
+      setScheduledLink(`${window.location.origin}/meeting?id=${id}`);
     }
-
-    setUpcomingMeetings(prev => [...prev, newMeeting].sort((a, b) => {
-      const dateA = new Date(`${a.date}T${a.time}`);
-      const dateB = new Date(`${b.date}T${b.time}`);
-      return dateA.getTime() - dateB.getTime();
-    }));
-
-    setScheduledLink(`${window.location.origin}/meeting?id=${newId}`);
     setScheduleSuccess(true);
   };
 
@@ -125,33 +110,27 @@ export default function DashboardPage() {
   const handleJoinMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (meetingCode.trim()) {
-      // Extract ID if it's a full URL
       let id = meetingCode.trim();
       try {
         if (id.includes('http')) {
           const url = new URL(id);
           id = url.searchParams.get('id') || id;
         }
-      } catch (e) {
-        // Ignore invalid URL errors
+      } catch {
+        // ignore
       }
       
       try {
-        const res = await fetch(`/api/meetings/${id}`);
-        if (!res.ok) {
-          alert("Meeting not found. Please check the code.");
-          return;
-        }
-      } catch (e) {
-        console.error(e);
+        const res = await meetingsApi.get(id);
+        if (res) navigate(`/meeting?id=${id}`);
+      } catch {
+        alert('Meeting not found. Please check the code.');
       }
-      
-      navigate(`/meeting?id=${id}`);
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
+  const handleLogout = async () => {
+    await authApi.logout();
     navigate('/');
   };
 
@@ -344,7 +323,7 @@ export default function DashboardPage() {
                             <div key={meeting.id} className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors flex flex-col gap-2">
                               <h4 className="font-medium text-white">{meeting.title}</h4>
                               <div className="flex items-center justify-between text-sm text-[#86868b]">
-                                <span>{new Date(meeting.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at {meeting.time}</span>
+                                <span>{new Date(meeting.scheduledStartAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at {new Date(meeting.scheduledStartAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
                                 <button 
                                   onClick={() => navigate(`/meeting?id=${meeting.id}`)}
                                   className="text-blue-400 hover:text-blue-300 font-medium transition-colors"
@@ -402,7 +381,7 @@ export default function DashboardPage() {
                       start: startOfWeek(startOfMonth(currentMonth)),
                       end: endOfWeek(endOfMonth(currentMonth))
                     }).map((day, i) => {
-                      const dayMeetings = upcomingMeetings.filter(m => isSameDay(parseISO(m.date), day));
+                      const dayMeetings = upcomingMeetings.filter(m => isSameDay(parseISO(m.scheduledStartAt), day));
                       const isCurrentMonth = isSameMonth(day, currentMonth);
                       const isToday = isSameDay(day, new Date());
                       
@@ -434,9 +413,9 @@ export default function DashboardPage() {
                                 key={meeting.id}
                                 onClick={() => navigate(`/meeting?id=${meeting.id}`)}
                                 className="text-xs p-1.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 truncate cursor-pointer hover:bg-blue-500/20 transition-colors"
-                                title={`${meeting.time} - ${meeting.title}`}
+                                title={`${new Date(meeting.scheduledStartAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${meeting.title}`}
                               >
-                                {meeting.time} {meeting.title}
+                                {new Date(meeting.scheduledStartAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} {meeting.title}
                               </div>
                             ))}
                           </div>
@@ -624,3 +603,6 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
+

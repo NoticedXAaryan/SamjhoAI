@@ -36,3 +36,13 @@ coverage/
 # Temporary
 .tmp/
 tmp/
+
+# Neon CLI config
+.neon/
+
+# MCP config (can be committed for project setup)
+!.mcp.json
+
+# IDE / AI tools
+.claude/
+.antigravity/

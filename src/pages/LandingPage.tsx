@@ -2,13 +2,14 @@ import { motion, useScroll, useTransform, AnimatePresence } from 'motion/react';
 import { useRef, useState, memo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Sparkles, Zap, Globe, Lock, Video, PlayCircle, Shield, Download, Mic, MessageSquare, PhoneOff, Cpu, Twitter, Linkedin, Github } from 'lucide-react';
+import { auth } from '../lib/api';
 
 const DynamicIslandNav = memo(() => {
   const [isExpanded, setIsExpanded] = useState(false);
   const navigate = useNavigate();
 
   const handleStartMeeting = () => {
-    if (localStorage.getItem('isAuthenticated') === 'true') {
+    if (auth.isLoggedIn()) {
       navigate('/dashboard');
     } else {
       navigate('/auth');
@@ -417,7 +418,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
 
   const handleStartMeeting = () => {
-    if (localStorage.getItem('isAuthenticated') === 'true') {
+    if (auth.isLoggedIn()) {
       navigate('/dashboard');
     } else {
       navigate('/auth');

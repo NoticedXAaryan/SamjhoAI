@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: samjho-backend
+    name: samjho-ai
     runtime: node
     region: oregon
     plan: free
@@ -11,9 +11,11 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: samjho-db
+          property: connectionString
       - key: JWT_SECRET
-        generateValue: true
+        sync: false
       - key: JWT_EXPIRES_IN
         value: 15m
       - key: JWT_REFRESH_SECRET
@@ -21,4 +23,14 @@ services:
       - key: JWT_REFRESH_EXPIRES_IN
         value: 7d
       - key: APP_ORIGIN
-        sync: false
+        fromService:
+          name: samjho-ai
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
+databases:
+  - name: samjho-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: "17"
+    ipAllowList: []

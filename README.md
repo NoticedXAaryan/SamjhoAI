@@ -44,7 +44,7 @@
 |---|---|
 | **Frontend** | React 19, TypeScript, Tailwind CSS v4, Framer Motion, GSAP |
 | **Backend** | Node.js, Express, Socket.io |
-| **Database** | PostgreSQL (Supabase) via Prisma ORM |
+| **Database** | PostgreSQL (Neon or Render) via Prisma ORM |
 | **Real-time** | Socket.io WebSocket signaling + WebRTC peer video |
 | **Auth** | JWT (access + refresh tokens), bcrypt |
 | **Build** | Vite 6, tsx |
@@ -68,8 +68,7 @@ samjho/
 │   └── store/                 # Zustand global state
 ├── schema.prisma              # Database schema (User, Meeting, Participant, Message)
 ├── server.ts                  # Dev server (Vite + Express unified)
-├── render.yaml                # Render.com deployment config
-├── public/_redirects          # Cloudflare Pages SPA routing
+├── render.yaml                # Render.com deployment config (Blueprint)
 └── .env.example               # Environment variables template
 ```
 
@@ -79,7 +78,7 @@ samjho/
 
 ### Prerequisites
 - Node.js 20+
-- A free [Supabase](https://supabase.com) account (for the database)
+- A PostgreSQL database (e.g. [Neon](https://neon.tech) or [Render PostgreSQL](https://render.com/docs/databases))
 
 ### 1. Clone
 
@@ -103,18 +102,17 @@ cp .env.example .env
 Edit `.env` with your values:
 
 ```env
-DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres
+DATABASE_URL=postgresql://user:pass@host:5432/dbname?sslmode=require
 JWT_SECRET=<64-char random string>
 JWT_REFRESH_SECRET=<64-char random string>
-APP_ORIGIN=http://localhost:3000
 ```
 
 > **Generate secrets:** `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
 
-### 4. Migrate the database
+### 4. Sync the database
 
 ```bash
-npm run prisma:migrate:dev
+npx prisma db push
 ```
 
 ### 5. Start
@@ -127,80 +125,40 @@ Open **[http://localhost:3000](http://localhost:3000)**
 
 ---
 
-## Deployment — 100% Free
+## Deployment
 
-This project is designed to run entirely on free tiers across three platforms:
+The entire app (frontend + backend) deploys as a **single Node.js service on Render.com**:
 
 ```
-Cloudflare Pages  ──► Render.com Backend  ──► Supabase (PostgreSQL)
-   (Frontend)            (API + WS)              (Database)
+Render Web Service (Node.js)
+├── Vite-built React frontend (served as static)
+├── Express API + Socket.IO server
+└── Render PostgreSQL (free tier)
 ```
 
----
+### Quick Deploy
 
-### 1️⃣ Supabase — Database
+1. Push this repo to GitHub
+2. Go to [render.com](https://render.com) → **New +** → **Blueprint Instance**
+3. Select this repository — `render.yaml` is auto-detected
+4. Fill in `JWT_SECRET` and `JWT_REFRESH_SECRET` (generate with the command above)
+5. Click **Apply** — Render creates the web service + PostgreSQL database automatically
 
-1. Create a free account at [supabase.com](https://supabase.com)
-2. Create a new **project** (pick a region near your users)
-3. Go to **Settings → Database → Connection string → URI**
-4. Copy the connection string — save it as `DATABASE_URL`
+That's it. One URL, everything works — auth, meetings, WebRTC, and chat.
 
-> **Free tier:** 500MB storage · 5GB bandwidth · 50,000 monthly users
-
----
-
-### 2️⃣ Render.com — Backend API + WebSockets
-
-1. Sign up at [render.com](https://render.com) with your GitHub account
-2. Click **New → Web Service** and connect this repository
-3. Render auto-detects `render.yaml` and configures the service
-4. Set the following **Environment Variables** in the Render dashboard:
-
-| Variable | Value |
-|---|---|
-| `DATABASE_URL` | *(paste from Supabase)* |
-| `JWT_SECRET` | *(generate a 64-char random string)* |
-| `JWT_REFRESH_SECRET` | *(generate another 64-char random string)* |
-| `APP_ORIGIN` | *(your Cloudflare Pages URL — set after step 3)* |
-
-5. Click **Create Web Service** — your backend URL will be `https://samjho-backend.onrender.com`
-
-> **Free tier caveat:** Spins down after 15 min of inactivity (~60s cold start on first wake). Use [UptimeRobot](https://uptimerobot.com) (free) to ping `https://YOUR-RENDER-URL/health` every 5 min.
+> **Free tier caveat:** The web service spins down after 15 min of inactivity (~50s cold start). Free PostgreSQL databases also sleep. Use [UptimeRobot](https://uptimerobot.com) (free) to ping `https://YOUR-RENDER-URL/health` every 5 min.
 
 ---
 
-### 3️⃣ Cloudflare Pages — Frontend
+### Environment Variables
 
-1. Go to [pages.cloudflare.com](https://pages.cloudflare.com)
-2. Click **Create a project → Connect to Git** and select this repository
-3. Configure the build:
-
-| Setting | Value |
-|---|---|
-| Build command | `npm run build` |
-| Build output directory | `dist` |
-
-4. Add this **Environment Variable** in the Pages settings:
-
-| Variable | Value |
-|---|---|
-| `VITE_API_URL` | `https://samjho-backend.onrender.com` |
-
-5. Click **Save and Deploy** — your app will be live at `https://samjho.pages.dev`
-6. **Go back to Render** and update `APP_ORIGIN` to your Cloudflare Pages URL
-
-> **Free tier:** Unlimited bandwidth · Unlimited requests · Global CDN
-
----
-
-### 4️⃣ Keep the Backend Warm (Recommended)
-
-1. Create a free account at [uptimerobot.com](https://uptimerobot.com)
-2. Add a new **HTTP(S) Monitor**:
-   - URL: `https://YOUR-RENDER-URL/health`
-   - Interval: **5 minutes**
-
-This prevents cold starts keeping your server awake 24/7 at zero cost.
+| Variable | Required | Description |
+|---|---|---|
+| `NODE_ENV` | No | Auto-set to `production` by Render |
+| `DATABASE_URL` | Yes | Auto-set from Render PostgreSQL |
+| `JWT_SECRET` | Yes | Min 32 chars — signs access tokens |
+| `JWT_REFRESH_SECRET` | Yes | Min 32 chars — signs refresh tokens |
+| `APP_ORIGIN` | No | Auto-set from Render's external URL |
 
 ---
 

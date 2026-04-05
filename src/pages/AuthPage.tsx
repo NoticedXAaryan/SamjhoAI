@@ -2,42 +2,52 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Sparkles, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { authApi, auth } from '../lib/api';
 
 export default function AuthPage() {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleAuth = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
-    
+    setLoading(true);
+
     const formData = new FormData(e.currentTarget);
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
-    
-    if (!isLogin) {
-      const firstName = formData.get('firstName') as string;
-      const lastName = formData.get('lastName') as string;
-      if (!firstName?.trim() || !lastName?.trim()) {
-        setError('Please fill out all fields.');
-        return;
+
+    try {
+      if (isLogin) {
+        const res = await authApi.login({ email, password });
+        auth.setTokens(res.accessToken, res.refreshToken);
+        auth.setUser(res.user);
+      } else {
+        const firstName = formData.get('firstName') as string;
+        const lastName = formData.get('lastName') as string;
+        if (!firstName?.trim() || !lastName?.trim()) {
+          setError('Please fill out all fields.');
+          setLoading(false);
+          return;
+        }
+        const res = await authApi.register({ firstName, lastName, email, password });
+        auth.setTokens(res.accessToken, res.refreshToken);
+        auth.setUser(res.user);
       }
+      navigate('/dashboard');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
     }
-
-    if (!email?.trim() || !password?.trim()) {
-      setError('Please fill out all fields.');
-      return;
-    }
-
-    localStorage.setItem('isAuthenticated', 'true');
-    navigate('/meeting');
   };
 
   const handleSocialAuth = () => {
-    localStorage.setItem('isAuthenticated', 'true');
-    navigate('/meeting');
+    // Social auth requires OAuth provider setup — show info for now
+    setError('Social login coming soon. Please use email & password.');
   };
 
   return (
@@ -131,8 +141,8 @@ export default function AuthPage() {
             )}
           </AnimatePresence>
 
-          <button type="submit" className="w-full bg-white text-black rounded-xl py-3.5 font-semibold hover:scale-[1.02] transition-transform mt-2 shadow-[0_0_20px_rgba(255,255,255,0.2)]">
-            {isLogin ? 'Sign In' : 'Create Account'}
+          <button type="submit" disabled={loading} className="w-full bg-white text-black rounded-xl py-3.5 font-semibold hover:scale-[1.02] transition-transform mt-2 shadow-[0_0_20px_rgba(255,255,255,0.2)] disabled:opacity-70 disabled:cursor-not-allowed disabled:scale-100">
+            {loading ? (isLogin ? 'Signing in...' : 'Creating account...') : (isLogin ? 'Sign In' : 'Create Account')}
           </button>
         </form>
 
