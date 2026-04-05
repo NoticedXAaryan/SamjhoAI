@@ -46,3 +46,9 @@ tmp/
 # IDE / AI tools
 .claude/
 .antigravity/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
