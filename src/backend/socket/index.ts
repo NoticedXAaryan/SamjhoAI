@@ -10,12 +10,39 @@ interface UserData {
   isVideoOff: boolean;
   isSpeaking: boolean;
   isHandRaised: boolean;
+  isPresenting: boolean;
   initials: string;
+}
+
+const MAX_MEETING_SIZE = 8;
+
+// Socket connection rate limiting (per IP)
+const socketConnectionMap = new Map<string, number>();
+const SOCKET_CONN_WINDOW = 60_000; // 1 min window
+const SOCKET_MAX_CONN_PER_WINDOW = 10;
+
+function checkSocketRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const count = socketConnectionMap.get(ip) ?? 0;
+  if (count >= SOCKET_MAX_CONN_PER_WINDOW) return false;
+  socketConnectionMap.set(ip, count + 1);
+
+  // Clean old entries
+  if (count === 0) {
+    setTimeout(() => socketConnectionMap.delete(ip), SOCKET_CONN_WINDOW);
+  }
+  return true;
 }
 
 export function registerSocketHandlers(io: Server): void {
   // ── Auth middleware: validate JWT on socket connect ────────────────────────
   io.use(async (socket: Socket, next) => {
+    // Rate limit socket connections per IP
+    const ip = socket.handshake.address;
+    if (!checkSocketRateLimit(ip)) {
+      return next(new Error('Too many socket connections. Please try again in a minute.'));
+    }
+
     const token = socket.handshake.auth.accessToken ?? socket.handshake.query.token;
     if (!token || typeof token !== 'string') {
       return next(new Error('Authentication required'));
@@ -42,13 +69,20 @@ export function registerSocketHandlers(io: Server): void {
 
     // ── Join a meeting room ──────────────────────────────────────────────────
     socket.on('join-room', async (meetingId: string, userDetails: Omit<UserData, 'id'>) => {
-      // Verify user has access to this meeting
       const dbUser = socket.data.userPayload;
+
+      // Check meeting size
+      const roomSockets = io.sockets.adapter.rooms.get(meetingId);
+      const currentSize = roomSockets ? roomSockets.size : 0;
+      if (currentSize >= MAX_MEETING_SIZE) {
+        socket.emit('meeting-full', { max: MAX_MEETING_SIZE });
+        return;
+      }
+
       const participation = await prisma.participant.findUnique({
         where: { userId_meetingId: { userId: dbUser.id, meetingId } },
       });
 
-      // If not a participant yet, auto-join as GUEST
       if (!participation) {
         try {
           await prisma.participant.create({
@@ -65,22 +99,19 @@ export function registerSocketHandlers(io: Server): void {
       socket.data.meetingId = meetingId;
       socket.data.user = user;
 
-      console.log(`[Socket] ${user.name} (${socket.id}) joined room ${meetingId}`);
+      console.log(`[Socket] ${user.name} (${socket.id}) joined room ${meetingId} (${currentSize + 1}/${MAX_MEETING_SIZE})`);
 
-      // Send existing participants to the newcomer
-      const roomSockets = io.sockets.adapter.rooms.get(meetingId);
-      if (roomSockets) {
-        const existing = Array.from(roomSockets)
+      const updatedRoom = io.sockets.adapter.rooms.get(meetingId);
+      if (updatedRoom) {
+        const existing = Array.from(updatedRoom)
           .filter((id) => id !== socket.id)
           .map((id) => io.sockets.sockets.get(id)?.data.user)
           .filter(Boolean) as UserData[];
         socket.emit('existing-participants', existing);
       }
 
-      // Notify everyone else
       socket.to(meetingId).emit('user-connected', user);
 
-      // Mark meeting as active
       try {
         await prisma.meeting.updateMany({
           where: { id: meetingId, status: 'SCHEDULED' },
@@ -91,8 +122,32 @@ export function registerSocketHandlers(io: Server): void {
       }
     });
 
-    // ── State change (mute, video, hand raise) ───────────────────────────────
-    socket.on('state-change', (meetingId: string, state: Partial<UserData>) => {
+    // ── Rejoin room (on reconnect) — don't broadcast to others ───────────────
+    socket.on('rejoin-room', async (meetingId: string, stateUpdate: Partial<Pick<UserData, 'isMuted' | 'isVideoOff' | 'isHandRaised'>>) => {
+      const dbUser = socket.data.userPayload;
+      if (!dbUser) return socket.disconnect();
+
+      socket.join(meetingId);
+      socket.data.meetingId = meetingId;
+
+      if (socket.data.user) {
+        socket.data.user = { ...socket.data.user, ...stateUpdate };
+      }
+
+      const roomSockets = io.sockets.adapter.rooms.get(meetingId);
+      if (roomSockets) {
+        const existing = Array.from(roomSockets)
+          .filter((id) => id !== socket.id)
+          .map((id) => io.sockets.sockets.get(id)?.data.user)
+          .filter(Boolean) as UserData[];
+        socket.emit('existing-participants', existing);
+      }
+
+      console.log(`[Socket] ${dbUser.name} (${socket.id}) rejoined room ${meetingId}`);
+    });
+
+    // ── State change (mute, video, hand raise, presenting) ──────────────────
+    socket.on('state-change', (meetingId: string, state: Partial<Pick<UserData, 'isMuted' | 'isVideoOff' | 'isHandRaised' | 'isPresenting'>>) => {
       socket.data.user = { ...socket.data.user, ...state };
       socket.to(meetingId).emit('user-state-changed', { id: socket.id, ...state });
     });
@@ -102,7 +157,6 @@ export function registerSocketHandlers(io: Server): void {
       const dbUser = socket.data.userPayload;
       const senderName = message.senderName || socket.data.user?.name || 'Guest';
 
-      // Persist to database
       try {
         await prisma.message.create({
           data: {
@@ -140,12 +194,63 @@ export function registerSocketHandlers(io: Server): void {
       io.to(payload.to).emit('ice-candidate', { from: socket.id, candidate: payload.candidate });
     });
 
+    // ── End meeting for all (host only) ──────────────────────────────────────
+    socket.on('end-meeting', async (meetingId: string) => {
+      const dbUser = socket.data.userPayload;
+      if (!dbUser) return;
+
+      // Verify this user is the host
+      const participation = await prisma.participant.findUnique({
+        where: { userId_meetingId: { userId: dbUser.id, meetingId } },
+      });
+      if (participation?.role !== 'HOST') {
+        socket.emit('end-meeting-error', 'Only the host can end the meeting');
+        return;
+      }
+
+      // Mark meeting as completed and kick all participants
+      await prisma.meeting.updateMany({
+        where: { id: meetingId, status: 'ACTIVE' },
+        data: { status: 'COMPLETED', scheduledEndAt: new Date() },
+      });
+
+      io.to(meetingId).emit('meeting-ended', { reason: 'host-ended' });
+
+      // Disconnect all sockets in the room
+      const room = io.sockets.adapter.rooms.get(meetingId);
+      if (room) {
+        for (const socketId of room) {
+          const s = io.sockets.sockets.get(socketId);
+          if (s) s.disconnect(true);
+        }
+      }
+    });
+
+    // ── Screen share state broadcast ─────────────────────────────────────────
+    socket.on('presenting-change', (meetingId: string, isPresenting: boolean) => {
+      socket.data.user = { ...socket.data.user, isPresenting };
+      socket.to(meetingId).emit('user-state-changed', { id: socket.id, isPresenting });
+    });
+
     // ── Disconnect ───────────────────────────────────────────────────────────
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       console.log(`[Socket] Disconnected: ${socket.id}`);
       const meetingId = socket.data.meetingId;
       if (meetingId) {
         socket.to(meetingId).emit('user-disconnected', socket.id);
+
+        // If room is now empty, mark meeting as completed
+        const room = io.sockets.adapter.rooms.get(meetingId);
+        if (!room || room.size === 0) {
+          try {
+            await prisma.meeting.updateMany({
+              where: { id: meetingId, status: 'ACTIVE' },
+              data: { status: 'COMPLETED', scheduledEndAt: new Date() },
+            });
+          } catch {
+            // Non-blocking
+          }
+        }
       }
     });
   });

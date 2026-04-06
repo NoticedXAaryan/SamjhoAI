@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import { prisma } from './lib/prisma.js';
 import { env } from './config/env.js';
 import authRouter from './routes/auth.js';
 import meetingsRouter from './routes/meetings.js';
@@ -23,15 +24,50 @@ export function createBackend() {
   });
   registerSocketHandlers(io);
 
-  // ── Middleware ─────────────────────────────────────────────────────────────
-  app.use(helmet({ contentSecurityPolicy: false })); // CSP managed by Vite in dev
+  // ── Security middleware ────────────────────────────────────────────────────
+  const isProd = env.NODE_ENV === 'production';
+
+  app.use(helmet(isProd ? {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // Vite needs inline scripts in dev
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'blob:', 'https://storage.googleapis.com', 'https://cdn.jsdelivr.net'],
+        connectSrc: ["'self'", 'ws:', 'wss:', 'https://storage.googleapis.com', 'https://cdn.jsdelivr.net'],
+        mediaSrc: ["'self'", 'blob:', 'mediastream:'],
+        workerSrc: ["'self'", 'blob:'],
+        frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
+      },
+    },
+  } : { contentSecurityPolicy: false }));
+
   app.use(cors({ origin: env.APP_ORIGIN, credentials: true }));
-  app.use(express.json());
-  app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+  app.use(express.json({ limit: '10mb' }));   // prevent giant payloads
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  app.use(morgan(isProd ? 'combined' : 'dev'));
 
   // ── Health check (for UptimeRobot keep-alive) ──────────────────────────────
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  app.get('/health', async (_req, res) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      res.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
+    } catch {
+      res.status(503).json({ status: 'error', db: 'disconnected', timestamp: new Date().toISOString() });
+    }
+  });
+
+  // ── WebRTC ICE config (returns TURN credentials if configured) ─────────────
+  app.get('/api/webrtc/ice-config', (_req, res) => {
+    res.json({
+      iceServers: [
+        { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+        ...(env.TURN_URL
+          ? [{ urls: env.TURN_URL, username: env.TURN_USER ?? '', credential: env.TURN_PASS ?? '' }]
+          : []),
+      ],
+    });
   });
 
   // ── API Routes ─────────────────────────────────────────────────────────────
@@ -41,6 +77,12 @@ export function createBackend() {
   // ── 404 catch-all for API ──────────────────────────────────────────────────
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Not found' });
+  });
+
+  // ── Global error handler (prevents crash on unhandled errors) ──────────────
+  app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error('[Express] Unhandled error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   });
 
   return { app, httpServer, io };

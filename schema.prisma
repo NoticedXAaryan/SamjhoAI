@@ -8,16 +8,23 @@ datasource db {
 }
 
 model User {
-  id             String        @id @default(uuid())
-  email          String        @unique
-  name           String
-  passwordHash   String
-  preferences    Json?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                    String        @id @default(uuid())
+  email                 String        @unique
+  name                  String
+  passwordHash          String
+  emailVerified          Boolean       @default(false)
+  emailVerificationToken String?       // 32-byte hex token for email verification link
+  passwordResetToken     String?       // 32-byte hex token for password reset link
+  passwordResetExpires   DateTime?     // Reset link expiry (30 min from creation)
+  failedLoginAttempts    Int           @default(0)
+  lockedUntil            DateTime?
+  avatarId              Int           @default(0)
+  preferences           Json?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
-  hostedMeetings Meeting[]     @relation("MeetingHost")
-  participations Participant[]
+  hostedMeetings        Meeting[]     @relation("MeetingHost")
+  participations        Participant[]
 
   @@map("users")
 }

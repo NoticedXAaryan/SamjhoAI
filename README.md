@@ -121,60 +121,57 @@ npx prisma db push
 npm run dev
 ```
 
-Open **[http://localhost:3000](http://localhost:3000)**
+Open **[http://localhost:5173](http://localhost:5173)** (Vite dev server)
 
 ---
 
 ## Deployment
 
-The entire app (frontend + backend) deploys as a **single Node.js service on Render.com**:
+The entire app (frontend + backend) deploys as a **single service** — Render.com or [Railway](https://railway.app) both work.
 
-```
-Render Web Service (Node.js)
-├── Vite-built React frontend (served as static)
-├── Express API + Socket.IO server
-└── Render PostgreSQL (free tier)
-```
+### Railway (Recommended)
 
-### Quick Deploy
+1. Push this repo to GitHub
+2. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
+3. Select `NoticedXAaryan/SamjhoAI`
+4. Add environment variables (Variables tab):
+   - `NODE_ENV=production`
+   - `DATABASE_URL` — Neon PostgreSQL (pooler URL from [neon.tech](https://neon.tech))
+   - `JWT_SECRET` — `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
+   - `JWT_REFRESH_SECRET` — different key, same command
+   - `EMAIL_RESEND_API_KEY` — from [resend.com](https://resend.com)
+   - `APP_ORIGIN` — your Railway domain (after first deploy)
+   - `VITE_API_URL` — same as `APP_ORIGIN`
+5. Deploy — Railway auto-runs `npm install → postinstall → vite build → npm start`
+
+### Render.com
 
 1. Push this repo to GitHub
 2. Go to [render.com](https://render.com) → **New +** → **Blueprint Instance**
 3. Select this repository — `render.yaml` is auto-detected
-4. Fill in `JWT_SECRET` and `JWT_REFRESH_SECRET` (generate with the command above)
-5. Click **Apply** — Render creates the web service + PostgreSQL database automatically
+4. Fill in variables and click **Apply**
 
-That's it. One URL, everything works — auth, meetings, WebRTC, and chat.
-
-> **Free tier caveat:** The web service spins down after 15 min of inactivity (~50s cold start). Free PostgreSQL databases also sleep. Use [UptimeRobot](https://uptimerobot.com) (free) to ping `https://YOUR-RENDER-URL/health` every 5 min.
+> **Free tier caveat:** Services spin down after inactivity (~50s cold start). Use [UptimeRobot](https://uptimerobot.com) (free) to ping `https://YOUR-URL/health` every 5 min.
 
 ---
 
-### Environment Variables
-
-| Variable | Required | Description |
-|---|---|---|
-| `NODE_ENV` | No | Auto-set to `production` by Render |
-| `DATABASE_URL` | Yes | Auto-set from Render PostgreSQL |
-| `JWT_SECRET` | Yes | Min 32 chars — signs access tokens |
-| `JWT_REFRESH_SECRET` | Yes | Min 32 chars — signs refresh tokens |
-| `APP_ORIGIN` | No | Auto-set from Render's external URL |
-
----
-
-## Environment Variables
+### Full Production Variables
 
 | Variable | Required | Description |
 |---|---|---|
 | `NODE_ENV` | Yes | `development` or `production` |
 | `PORT` | No | Server port (default: `3000`) |
 | `APP_ORIGIN` | Yes | Frontend URL — used for CORS |
-| `DATABASE_URL` | Yes | PostgreSQL URI from Supabase |
-| `JWT_SECRET` | Yes | Min 32 chars — signs access tokens |
+| `DATABASE_URL` | Yes | PostgreSQL URI (use Neon pooler) |
+| `JWT_SECRET` | Yes | 64 hex chars — access tokens |
 | `JWT_EXPIRES_IN` | No | Access token TTL (default: `15m`) |
-| `JWT_REFRESH_SECRET` | Yes | Min 32 chars — signs refresh tokens |
+| `JWT_REFRESH_SECRET` | Yes | 64 hex chars — refresh tokens |
 | `JWT_REFRESH_EXPIRES_IN` | No | Refresh token TTL (default: `7d`) |
-| `VITE_API_URL` | Prod only | Backend URL — set in Cloudflare Pages |
+| `VITE_API_URL` | Prod only | Backend URL — set to `APP_ORIGIN` |
+| `EMAIL_RESEND_API_KEY` | No | Resend API key for email delivery |
+| `TURN_URL` | No | TURN server for WebRTC (optional) |
+| `TURN_USER` | No | TURN username |
+| `TURN_PASS` | No | TURN password |
 
 ---
 

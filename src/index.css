@@ -22,12 +22,73 @@
   .glass-panel {
     @apply bg-white/5 border border-white/10 backdrop-blur-3xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),_0_4px_30px_rgba(0,0,0,0.5)];
   }
-  
+
   .text-gradient-cyan {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-cyan-glow to-blue-500;
   }
-  
+
   .text-gradient-magenta {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-magenta to-deep-purple;
+  }
+
+  /* ── Reusable design tokens ───────────────────────────── */
+
+  /* Glass card — used for Dashboard cards, meeting tiles, etc */
+  .glass-card {
+    @apply bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-[2rem] shadow-xl;
+  }
+
+  /* Modal backdrop — consistent across all modals */
+  .modal-backdrop {
+    @apply fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md;
+  }
+
+  /* Primary action button — shared white-on-dark style */
+  .btn-primary {
+    @apply bg-white text-black rounded-xl py-3.5 px-6 font-semibold hover:scale-[1.02] active:scale-[0.99] transition-transform shadow-[0_0_20px_rgba(255,255,255,0.15)];
+  }
+  .btn-primary:disabled {
+    @apply opacity-70 cursor-not-allowed scale-100 hover:scale-100 active:scale-100;
+  }
+
+  /* Input field — consistent focus ring across all forms */
+  .input-field {
+    @apply w-full bg-black/30 border border-white/15 rounded-xl px-4 py-3 text-white outline-none placeholder:text-white/30 transition-all focus:border-blue-400/60 focus:ring-2 focus:ring-blue-400/20 [color-scheme:dark];
+  }
+  .input-field.input-error {
+    @apply border-red-500/50;
+  }
+
+  /* Error alert — styled like a glass panel */
+  .error-alert {
+    @apply bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl p-3;
+  }
+
+  /* ── Custom scrollbar ───────────────────────────────────── */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:active {
+    background: rgba(255, 255, 255, 0.35);
   }
 }

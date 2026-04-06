@@ -3,13 +3,17 @@ import { motion, AnimatePresence } from 'motion/react';
 import { io, Socket } from 'socket.io-client';
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff, MessageSquare,
-  Users, Settings, Sparkles, X, Info,
+  Users, Settings, Sparkles, X, Info, ArrowLeft,
   MonitorUp, Hand, LayoutGrid, Maximize, FileText,
-  CheckCircle2, AlertCircle, Shield, User, Send as SendIcon
+  CheckCircle2, AlertCircle, Shield, User, Send as SendIcon,
+  WifiOff
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { auth, meetingsApi } from '../lib/api';
+import { useMeetingMedia } from '../lib/useMeetingMedia';
+import { useMediaDevices } from '../lib/useMediaDevices';
+import { toast } from 'sonner';
 
 // --- Types ---
 type SidebarTab = 'chat' | 'participants' | 'transcript' | null;
@@ -21,6 +25,7 @@ interface MeetingParticipant {
   isMuted: boolean;
   isVideoOff: boolean;
   isSpeaking: boolean;
+  isPresenting: boolean;
   avatarUrl?: string;
   initials: string;
   stream?: MediaStream;
@@ -36,16 +41,17 @@ interface ChatMessage {
 
 // --- Components ---
 
-function HandTrackingIndicator({ isTracking }: { isTracking: boolean }) {
+function HandTrackingIndicator({ gesture, handsDetected }: { gesture: string; handsDetected: number }) {
+  const hasHands = handsDetected > 0;
   return (
     <div className={cn(
       "absolute top-3 right-3 px-2.5 py-1.5 rounded-md backdrop-blur-md border text-xs font-medium flex items-center gap-1.5 transition-colors",
-      isTracking
+      hasHands
         ? "bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]"
         : "bg-red-500/10 border-red-500/30 text-red-400"
     )}>
-      {isTracking ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-      {isTracking ? "Hands in frame" : "Hands not visible"}
+      {hasHands ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+      {hasHands ? `Detected: ${gesture || 'Hand(s) visible'}` : "Waiting for hands"}
     </div>
   );
 }
@@ -79,12 +85,11 @@ export default function MeetingPage() {
   const searchParams = new URLSearchParams(location.search);
   const meetingId = searchParams.get('id') || 'default-room';
 
-  // Route guard
-  useEffect(() => {
-    if (!auth.isLoggedIn()) {
-      navigate('/auth', { state: { from: location } });
-    }
-  }, [navigate, location]);
+  // Route guard — skip render if not authenticated
+  if (!auth.isLoggedIn()) {
+    navigate('/auth', { state: { from: location } });
+    return null;
+  }
 
   // Pre-join state
   const [hasJoined, setHasJoined] = useState(false);
@@ -95,13 +100,89 @@ export default function MeetingPage() {
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isAiActive, setIsAiActive] = useState(true);
   const [activeTab, setActiveTab] = useState<SidebarTab>(null);
-  const [currentCaption, setCurrentCaption] = useState("We are currently testing the real-time translation capabilities.");
-  const [handsInFrame, setHandsInFrame] = useState(true);
   const [layout, setLayout] = useState<'speaker' | 'grid'>('speaker');
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const localVideoRef = useRef<HTMLVideoElement>(null);
+  const localVideoGridRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+
+  // Refs for current state inside socket callback handlers — avoids stale closures on reconnect
+  const stateRef = useRef({ isMuted, isVideoOff, isHandRaised, userName });
+  useEffect(() => {
+    stateRef.current = { isMuted, isVideoOff, isHandRaised, userName };
+  });
+
+  // Track socket connection state for reconnection recovery
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+  const reconnectAttemptsRef = useRef(0);
+
+  // WebRTC ICE servers fetched from backend (supports dynamic TURN)
+  const iceServersRef = useRef<RTCIceServer[]>([]);
+  useEffect(() => {
+    if (!hasJoined) return;
+    fetch(`${window.location.origin}/api/webrtc/ice-config`)
+      .then((r) => r.json())
+      .then((data) => { iceServersRef.current = data.iceServers; })
+      .catch(() => { /* fallback to default below */ });
+  }, [hasJoined]);
+
+  // Real hand tracking, speech-to-text, and speaking detection
+  const {
+    handResults,
+    startHandTracking,
+    stopHandTracking,
+    speechTranscript,
+    speakingMap,
+    registerSpeakingAnalyser,
+    unregisterSpeakingAnalyser,
+  } = useMeetingMedia(isAiActive);
+
+  // Media device selection
+  const { audioDevices, videoDevices, selectedAudioId, selectedVideoId, setSelectedAudioId, setSelectedVideoId } = useMediaDevices();
+
+  // Restart local stream with new device selections
+  const restartWithDevices = useCallback(async (deviceId?: string) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: selectedAudioId ? { deviceId: { exact: selectedAudioId } } : true,
+        video: deviceId ? { deviceId: { exact: deviceId } } : selectedVideoId ? { deviceId: { exact: selectedVideoId } } : true,
+      });
+
+      // Stop old tracks
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = stream;
+
+      // Update video element
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      if (localVideoGridRef.current) localVideoGridRef.current.srcObject = stream;
+
+      // Update peer connections
+      stream.getTracks().forEach((track) => {
+        peerConnectionsRef.current.forEach((pc) => {
+          const sender = pc.getSenders().find((s) => s.track?.kind === track.kind);
+          if (sender) sender.replaceTrack(track);
+        });
+      });
+    } catch (err) {
+      console.error('Failed to switch media device:', err);
+    }
+  }, [selectedAudioId, selectedVideoId]);
+
+  // Computed caption from speech + gesture
+  const displayCaption = speechTranscript.isFinal && speechTranscript.text
+    ? speechTranscript.text
+    : speechTranscript.interim || (isAiActive && handResults.gesture ? `Sign detected: ${handResults.gesture}` : '');
+
+  // Register hand tracking when local video element is available
+  useEffect(() => {
+    if (hasJoined && !isVideoOff && localVideoGridRef.current) {
+      startHandTracking(localVideoGridRef.current);
+    }
+    return () => {
+      stopHandTracking();
+    };
+  }, [hasJoined, isVideoOff, startHandTracking, stopHandTracking]);
 
   // Real-time state
   const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
@@ -118,6 +199,7 @@ export default function MeetingPage() {
   // Exit states
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [meetingEnded, setMeetingEnded] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   // Meeting Info state
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(true);
@@ -142,9 +224,11 @@ export default function MeetingPage() {
   };
 
   // Load meeting info
+  const [isHost, setIsHost] = useState(false);
   useEffect(() => {
     meetingsApi.get(meetingId).then((meeting) => {
       meetingTitleRef.current = meeting.title;
+      setIsHost(meeting.hostId === auth.getUser()?.id);
     }).catch(() => {});
   }, [meetingId]);
 
@@ -179,7 +263,15 @@ export default function MeetingPage() {
             localVideoRef.current.srcObject = s;
           }
         })
-        .catch((err) => console.error("Camera error", err));
+        .catch((err: Error) => {
+          console.error("Camera error", err);
+          if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            toast.error('Camera access denied. Please allow camera access in your browser settings.', { duration: 5000 });
+          } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+            toast.error('No camera found on this device.', { duration: 3000 });
+          }
+        });
+      setIsMuted(false);
     }
 
     return () => {
@@ -190,21 +282,12 @@ export default function MeetingPage() {
     };
   }, [isVideoOff]);
 
-  // Simulate hand tracking status changes
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setHandsInFrame(Math.random() > 0.2);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
   // WebRTC helper
   const createPeerConnection = useCallback((peerId: string, initiator: boolean, socket: Socket) => {
     const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-      ],
+      iceServers: iceServersRef.current.length > 0
+        ? iceServersRef.current
+        : [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }],
     });
 
     // Add local stream tracks
@@ -220,6 +303,8 @@ export default function MeetingPage() {
       const stream = event.streams[0];
       remoteStreamsRef.current.set(peerId, stream);
       setRemoteStreamsVersion((v) => v + 1); // Trigger re-render
+      // Register audio analyser for speaking detection
+      registerSpeakingAnalyser(peerId, stream);
     };
 
     pc.onicecandidate = (event) => {
@@ -232,12 +317,40 @@ export default function MeetingPage() {
     };
 
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
-        pc.close();
-        peerConnectionsRef.current.delete(peerId);
-        remoteStreamsRef.current.delete(peerId);
-        setParticipants((prev) => prev.filter((p) => p.id !== peerId));
-        setRemoteStreamsVersion((v) => v + 1);
+      if (pc.connectionState === 'failed') {
+        // Try to recover before giving up
+        try {
+          pc.restartIce();
+        } catch {
+          pc.close();
+          peerConnectionsRef.current.delete(peerId);
+          remoteStreamsRef.current.delete(peerId);
+          setParticipants((prev) => prev.filter((p) => p.id !== peerId));
+          setRemoteStreamsVersion((v) => v + 1);
+        }
+      } else if (pc.connectionState === 'disconnected') {
+        // Brief disconnect — wait before teardown
+        const timeout = setTimeout(() => {
+          if (pc.connectionState === 'disconnected') {
+            pc.close();
+            peerConnectionsRef.current.delete(peerId);
+            remoteStreamsRef.current.delete(peerId);
+            setParticipants((prev) => prev.filter((p) => p.id !== peerId));
+            setRemoteStreamsVersion((v) => v + 1);
+          }
+        }, 3000);
+        pc.onconnectionstatechange = () => {
+          if (pc.connectionState === 'connected') {
+            clearTimeout(timeout);
+          } else if (pc.connectionState === 'failed') {
+            clearTimeout(timeout);
+            pc.close();
+            peerConnectionsRef.current.delete(peerId);
+            remoteStreamsRef.current.delete(peerId);
+            setParticipants((prev) => prev.filter((p) => p.id !== peerId));
+            setRemoteStreamsVersion((v) => v + 1);
+          }
+        };
       }
     };
 
@@ -261,22 +374,72 @@ export default function MeetingPage() {
     const token = auth.getAccessToken();
     const socket = io(window.location.origin, {
       auth: { accessToken: token },
+      reconnection: true,
+      reconnectionAttempts: 20,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
     socketRef.current = socket;
 
     // Pending ICE candidates cache
     const pendingCandidates = new Map<string, RTCIceCandidateInit[]>();
+    let initialConnect = true;
 
     socket.on('connect', () => {
-      socket.emit('join-room', meetingId, {
-        name: userName || 'Guest User',
-        role: 'Guest',
-        isMuted,
-        isVideoOff,
-        isSpeaking: false,
-        isHandRaised,
-        initials: (userName || 'GU').substring(0, 2).toUpperCase()
-      });
+      setIsSocketConnected(true);
+      const state = stateRef.current;
+
+      if (initialConnect) {
+        initialConnect = false;
+        reconnectAttemptsRef.current = 0;
+        // First connection — join room as new participant
+        socket.emit('join-room', meetingId, {
+          name: state.userName || 'Guest User',
+          role: 'Guest',
+          isMuted: state.isMuted,
+          isVideoOff: state.isVideoOff,
+          isSpeaking: false,
+          isHandRaised: state.isHandRaised,
+          initials: (state.userName || 'GU').substring(0, 2).toUpperCase()
+        });
+      } else {
+        // Reconnection — rejoin room without broadcasting user-connected
+        socket.emit('rejoin-room', meetingId, {
+          name: state.userName || 'Guest User',
+          isMuted: state.isMuted,
+          isVideoOff: state.isVideoOff,
+          isHandRaised: state.isHandRaised,
+        });
+
+        // Catch up on missed messages
+        meetingsApi.messages(meetingId).then((msgs) => {
+          setChatMessages(msgs.map((m) => ({
+            id: m.id,
+            senderId: m.senderId,
+            senderName: m.senderName,
+            text: m.text,
+            timestamp: new Date(m.createdAt).toISOString(),
+          })));
+        }).catch(() => {});
+
+        toast.success('Reconnected to meeting', { duration: 2000 });
+      }
+    });
+
+    socket.on('disconnect', (reason) => {
+      setIsSocketConnected(false);
+      if (reason === 'io server disconnect' || reason === 'io client disconnect') {
+        // Server or client initiated disconnect — manual reconnect needed
+        socket.connect();
+      }
+    });
+
+    socket.on('reconnect', (attemptNumber) => {
+      reconnectAttemptsRef.current = attemptNumber;
+    });
+
+    socket.on('connect_error', () => {
+      setIsSocketConnected(false);
     });
 
     socket.on('existing-participants', (existingParticipants: MeetingParticipant[]) => {
@@ -298,6 +461,7 @@ export default function MeetingPage() {
 
     socket.on('user-connected', (user: MeetingParticipant) => {
       if (user.id === socket.id) return;
+      toast.info(`${user.name} joined the meeting`);
       setParticipants((prev) => {
         if (prev.find((p) => p.id === user.id)) return prev;
         return [...prev, { ...user, stream: remoteStreamsRef.current.get(user.id) || undefined }];
@@ -308,13 +472,12 @@ export default function MeetingPage() {
 
     socket.on('user-disconnected', (userId: string) => {
       const pc = peerConnectionsRef.current.get(userId);
-      if (pc) {
-        pc.close();
-        peerConnectionsRef.current.delete(userId);
-      }
+      if (pc) pc.close();
+      peerConnectionsRef.current.delete(userId);
       remoteStreamsRef.current.delete(userId);
       setParticipants((prev) => prev.filter((p) => p.id !== userId));
       setRemoteStreamsVersion((v) => v + 1);
+      toast.warning('A participant left the meeting');
     });
 
     socket.on('user-state-changed', (userState: Partial<MeetingParticipant> & { id: string }) => {
@@ -383,13 +546,66 @@ export default function MeetingPage() {
       });
     });
 
+    // Host ended the meeting for everyone
+    socket.on('meeting-ended', ({ reason }: { reason: string }) => {
+      toast.error(reason === 'host-ended' ? 'The host ended the meeting' : 'The meeting has ended', {
+        duration: 4000,
+      });
+      setHasJoined(false);
+      socket.disconnect();
+      peerConnectionsRef.current.forEach((pc) => pc.close());
+      peerConnectionsRef.current.clear();
+      remoteStreamsRef.current.clear();
+      setParticipants([]);
+      setTimeout(() => navigate('/dashboard'), 3000);
+    });
+
+    // Meeting is full
+    socket.on('meeting-full', ({ max }: { max: number }) => {
+      toast.error(`Meeting is full (max ${max} participants)`, { duration: 5000 });
+      setHasJoined(false);
+      socket.disconnect();
+      navigate('/dashboard');
+    });
+
     return () => {
       peerConnectionsRef.current.forEach((pc) => pc.close());
       peerConnectionsRef.current.clear();
       remoteStreamsRef.current.clear();
+      // Clean up all speaking analysers
+      participants.forEach((p) => unregisterSpeakingAnalyser(p.id));
       socket.disconnect();
     };
-  }, [meetingId, hasJoined, createPeerConnection]);
+  }, [meetingId, hasJoined]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (!hasJoined) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      switch (e.key.toLowerCase()) {
+        case 'm':
+          toggleMute();
+          break;
+        case 'v':
+          toggleVideo();
+          break;
+        case 'h':
+          setIsHandRaised((prev) => {
+            const next = !prev;
+            toast.info(next ? 'Hand raised' : 'Hand lowered', { duration: 1500 });
+            return next;
+          });
+          break;
+        case 'escape':
+          setIsLeaveModalOpen(true);
+          break;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [hasJoined, localStreamRef]);
 
   // Sync local state changes via socket
   useEffect(() => {
@@ -405,25 +621,27 @@ export default function MeetingPage() {
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setIsMuted(!audioTrack.enabled);
+        toast.success(audioTrack.enabled ? 'Microphone unmuted' : 'Microphone muted', { duration: 1500 });
+        return;
       }
-    } else {
-      setIsMuted((prev) => !prev);
     }
+    setIsMuted((prev) => {
+      toast.success(!prev ? 'Microphone unmuted' : 'Microphone muted', { duration: 1500 });
+      return !prev;
+    });
   }, []);
 
   // Handle video on/off during meeting
   const toggleVideo = useCallback(async () => {
     if (localStreamRef.current && !isVideoOff) {
-      // Turn off: stop video track
       localStreamRef.current.getVideoTracks().forEach((t) => t.stop());
       setIsVideoOff(true);
+      toast.info('Camera turned off', { duration: 1500 });
     } else if (!localStreamRef.current || isVideoOff) {
-      // Turn on: get new video stream
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         const videoTrack = stream.getVideoTracks()[0];
         if (localStreamRef.current) {
-          // Add track to existing stream
           localStreamRef.current.addTrack(videoTrack);
         } else {
           localStreamRef.current = stream;
@@ -433,7 +651,6 @@ export default function MeetingPage() {
         }
         setIsVideoOff(false);
 
-        // Update RTCPeerConnection senders
         peerConnectionsRef.current.forEach((pc) => {
           const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
           if (sender) {
@@ -442,8 +659,10 @@ export default function MeetingPage() {
             pc.addTrack(videoTrack, localStreamRef.current!);
           }
         });
+        toast.success('Camera turned on', { duration: 1500 });
       } catch (err) {
         console.error('Failed to turn on video:', err);
+        toast.error('Failed to access camera');
       }
     }
   }, [isVideoOff]);
@@ -476,8 +695,21 @@ export default function MeetingPage() {
           <div className="flex flex-col gap-3">
             <button
               onClick={() => {
+                // Clean up everything before rejoin
+                localStreamRef.current?.getTracks().forEach((t) => t.stop());
+                localStreamRef.current = null;
+                stopHandTracking();
+                participants.forEach((p) => unregisterSpeakingAnalyser(p.id));
+                peerConnectionsRef.current.forEach((pc) => pc.close());
+                peerConnectionsRef.current.clear();
+                remoteStreamsRef.current.clear();
+                socketRef.current?.disconnect();
+
                 setMeetingEnded(false);
                 setHasJoined(false);
+                setElapsedSeconds(0);
+                setParticipants([]);
+                setChatMessages([]);
               }}
               className="w-full py-3 rounded-xl font-medium bg-white/10 hover:bg-white/20 transition-colors"
             >
@@ -565,7 +797,10 @@ export default function MeetingPage() {
               </div>
 
               <button
-                onClick={() => setHasJoined(true)}
+                onClick={() => {
+                  setHasJoined(true);
+                  toast.success('Joined the meeting', { duration: 2000 });
+                }}
                 disabled={!userName.trim()}
                 className="w-full py-3.5 bg-white text-black font-semibold rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
               >
@@ -586,11 +821,84 @@ export default function MeetingPage() {
     );
   }
 
-  // Build display participant list (self + remote)
+  // Build display participant list (self + remote) with speaking status
   const displayParticipants = participants.map((p) => ({
     ...p,
     stream: remoteStreamsRef.current.get(p.id),
+    isSpeaking: speakingMap.get(p.id) ?? false,
   }));
+
+  // Screen share toggle
+  const toggleScreenShare = useCallback(async () => {
+    if (!isScreenSharing) {
+      try {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        const screenTrack = screenStream.getVideoTracks()[0];
+        screenTrack.onended = () => {
+          // User stopped sharing from browser UI — restore camera
+          const localTrack = localStreamRef.current?.getVideoTracks()[0];
+          if (localTrack) localTrack.enabled = !isVideoOff;
+          peerConnectionsRef.current.forEach((pc) => {
+            const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+            if (sender && localTrack) sender.replaceTrack(localTrack);
+          });
+          setIsScreenSharing(false);
+          socketRef.current?.emit('presenting-change', meetingId, false);
+          toast.success('Screen sharing stopped', { duration: 2000 });
+        };
+        // Replace video track in all peer connections
+        peerConnectionsRef.current.forEach((pc) => {
+          const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+          if (sender) sender.replaceTrack(screenTrack);
+        });
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = screenStream;
+        }
+        socketRef.current?.emit('presenting-change', meetingId, true);
+        setIsScreenSharing(true);
+        toast.success('Screen sharing started', { duration: 2000 });
+      } catch {
+        toast.error('Screen sharing cancelled');
+      }
+    } else {
+      // Stop screen share — restore camera track
+      if (localStreamRef.current) {
+        const videoTrack = localStreamRef.current.getVideoTracks()[0];
+        if (videoTrack) {
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = localStreamRef.current;
+          }
+          socketRef.current?.emit('presenting-change', meetingId, false);
+          setIsScreenSharing(false);
+          toast.success('Screen sharing stopped', { duration: 2000 });
+        }
+      }
+    }
+  }, [isScreenSharing, isVideoOff, meetingId]);
+
+  // End meeting for all (host only)
+  const endMeetingForAll = useCallback(() => {
+    if (!isHost) return;
+    setMeetingEnded(true);
+    socketRef.current?.emit('end-meeting', meetingId);
+  }, [isHost, meetingId]);
+
+  // Leave meeting (just disconnect local user)
+  const leaveMeeting = useCallback(() => {
+    setMeetingEnded(true);
+
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
+
+    stopHandTracking();
+    participants.forEach((p) => unregisterSpeakingAnalyser(p.id));
+
+    peerConnectionsRef.current.forEach((pc) => pc.close());
+    peerConnectionsRef.current.clear();
+    remoteStreamsRef.current.clear();
+
+    socketRef.current?.disconnect();
+  }, [participants]);
 
   return (
     <div className="h-screen w-full bg-[#050507] text-white overflow-hidden flex flex-col font-sans selection:bg-[#00FFFF]/30">
@@ -603,6 +911,25 @@ export default function MeetingPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Connection status badge */}
+          <div className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+            isSocketConnected
+              ? "bg-green-500/10 text-green-400"
+              : "bg-yellow-500/10 text-yellow-400"
+          )}>
+            {isSocketConnected ? (
+              <>
+                <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                Connected
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-3 h-3" />
+                Reconnecting...
+              </>
+            )}
+          </div>
           <button
             onClick={() => setLayout(layout === 'speaker' ? 'grid' : 'speaker')}
             className={cn(
@@ -612,8 +939,24 @@ export default function MeetingPage() {
           >
             <LayoutGrid className="w-5 h-5" />
           </button>
-          <button className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+          <button
+            onClick={() => {
+              if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+              } else {
+                document.exitFullscreen().catch(() => {});
+              }
+            }}
+            className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          >
             <Maximize className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            title="Back to Dashboard"
+          >
+            <ArrowLeft className="w-5 h-5" />
           </button>
         </div>
       </header>
@@ -623,9 +966,8 @@ export default function MeetingPage() {
 
         {/* Video Grid Area */}
         <main className={cn(
-          "flex-1 p-4 transition-all duration-300 ease-in-out relative",
-          activeTab ? "mr-80" : "mr-0",
-          layout === 'grid' ? "grid gap-4 auto-rows-fr" : "flex flex-col gap-4"
+          "flex-1 p-4 relative",
+          layout === 'grid' ? "grid gap-4" : "flex flex-col gap-4"
         )}
         style={{
           gridTemplateColumns: layout === 'grid'
@@ -682,13 +1024,13 @@ export default function MeetingPage() {
                 )}
 
                 {/* AI Captions */}
-                <CaptionsOverlay isActive={isAiActive} text={currentCaption} />
+                <CaptionsOverlay isActive={isAiActive} text={displayCaption} />
               </div>
 
               {/* Bottom Strip (Other Participants + Self View) */}
-              <div className="h-40 shrink-0 flex gap-4 overflow-x-auto">
+              <div className="h-32 sm:h-40 shrink-0 flex gap-3 overflow-x-auto px-1 pb-1">
                 {/* Self View */}
-                <div className="w-64 min-w-[16rem] relative rounded-xl overflow-hidden bg-[#111111] border-2 border-blue-500/30 shadow-lg">
+                <div className="w-48 sm:w-64 min-w-[12rem] sm:min-w-[16rem] relative rounded-xl overflow-hidden bg-[#111111] border-2 border-blue-500/30 shadow-lg shrink-0">
                   {isVideoOff ? (
                     <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a]">
                       <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 flex items-center justify-center text-xl font-bold">
@@ -698,13 +1040,16 @@ export default function MeetingPage() {
                   ) : (
                     <>
                       <video
-                        ref={localVideoRef}
+                        ref={(el) => {
+                          localVideoRef.current = el;
+                          localVideoGridRef.current = el;
+                        }}
                         autoPlay
                         playsInline
                         muted
                         className="w-full h-full object-cover transform -scale-x-100"
                       />
-                      <HandTrackingIndicator isTracking={handsInFrame} />
+                      <HandTrackingIndicator gesture={handResults.gesture} handsDetected={handResults.handsDetected} />
                     </>
                   )}
                   <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md border border-white/10 px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1.5">
@@ -744,7 +1089,7 @@ export default function MeetingPage() {
                       muted
                       className="w-full h-full object-cover transform -scale-x-100"
                     />
-                    <HandTrackingIndicator isTracking={handsInFrame} />
+                    <HandTrackingIndicator gesture={handResults.gesture} handsDetected={handResults.handsDetected} />
                   </>
                 )}
                 <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md border border-white/10 px-2.5 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2">
@@ -760,11 +1105,11 @@ export default function MeetingPage() {
 
               {/* Other Participants in Grid */}
               {displayParticipants.map((p) => (
-                <ParticipantTile key={p.id} participant={p} keyProp={p.id} />
+                <ParticipantTile key={p.id} participant={p} />
               ))}
 
               {/* AI Captions in Grid Mode (Floating at bottom) */}
-              <CaptionsOverlay isActive={isAiActive} text={currentCaption} />
+              <CaptionsOverlay isActive={isAiActive} text={displayCaption} />
             </>
           )}
 
@@ -956,39 +1301,20 @@ export default function MeetingPage() {
           </button>
 
           <button
-            onClick={async () => {
-              try {
-                const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-                // Replace video track in all peer connections
-                peerConnectionsRef.current.forEach((pc) => {
-                  const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
-                  if (sender) {
-                    sender.replaceTrack(stream.getVideoTracks()[0]);
-                  }
-                });
-                stream.getVideoTracks()[0].onended = () => {
-                  // Stop sharing: restore camera track
-                  if (localStreamRef.current) {
-                    const camVideo = localStreamRef.current.getVideoTracks()[0];
-                    if (camVideo) {
-                      peerConnectionsRef.current.forEach((pc) => {
-                        const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
-                        if (sender) sender.replaceTrack(camVideo);
-                      });
-                    }
-                  }
-                };
-              } catch (err) {
-                console.error('Screen share error:', err);
-              }
-            }}
-            className="w-12 h-12 rounded-full bg-white/10 text-white hover:bg-white/20 flex items-center justify-center transition-colors"
+            onClick={toggleScreenShare}
+            className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200",
+              isScreenSharing ? "bg-blue-500 text-white ring-2 ring-blue-400" : "bg-white/10 text-white hover:bg-white/20"
+            )}
           >
             <MonitorUp className="w-5 h-5" />
           </button>
 
           <button
-            onClick={() => setIsHandRaised(!isHandRaised)}
+            onClick={() => {
+              setIsHandRaised(!isHandRaised);
+              toast.info(!isHandRaised ? 'Hand raised' : 'Hand lowered', { duration: 1500 });
+            }}
             className={cn(
               "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200",
               isHandRaised ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-white/10 text-white hover:bg-white/20"
@@ -1010,7 +1336,7 @@ export default function MeetingPage() {
         <div className="w-1/3 flex items-center justify-end gap-3">
           {/* AI Translation Toggle */}
           <button
-            onClick={() => setIsAiActive(!isAiActive)}
+            onClick={() => { setIsAiActive(!isAiActive); toast.info(isAiActive ? 'AI features disabled' : 'AI features enabled', { duration: 1500 }); }}
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-all duration-300 border",
               isAiActive
@@ -1059,7 +1385,7 @@ export default function MeetingPage() {
       {/* Meeting Info Modal */}
       <AnimatePresence>
         {isInfoModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -1083,6 +1409,7 @@ export default function MeetingPage() {
                   onClick={() => {
                     navigator.clipboard.writeText(meetingLink);
                     setCopied(true);
+                    toast.success('Meeting link copied!', { duration: 2000 });
                     setTimeout(() => setCopied(false), 2000);
                   }}
                   className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center justify-center"
@@ -1105,7 +1432,7 @@ export default function MeetingPage() {
       {/* Leave Meeting Modal */}
       <AnimatePresence>
         {isLeaveModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -1114,6 +1441,17 @@ export default function MeetingPage() {
             >
               <h2 className="text-xl font-semibold mb-2">Leave meeting?</h2>
               <p className="text-[#86868b] mb-6">Are you sure you want to leave this meeting?</p>
+              {isHost && (
+                <button
+                  onClick={() => {
+                    setIsLeaveModalOpen(false);
+                    endMeetingForAll();
+                  }}
+                  className="w-full mb-3 py-2.5 rounded-xl font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors text-sm"
+                >
+                  End meeting for everyone
+                </button>
+              )}
               <div className="flex gap-3">
                 <button
                   onClick={() => setIsLeaveModalOpen(false)}
@@ -1124,13 +1462,9 @@ export default function MeetingPage() {
                 <button
                   onClick={() => {
                     setIsLeaveModalOpen(false);
-                    setMeetingEnded(true);
-                    // Cleanup
-                    peerConnectionsRef.current.forEach((pc) => pc.close());
-                    peerConnectionsRef.current.clear();
-                    socketRef.current?.disconnect();
+                    leaveMeeting();
                   }}
-                  className="flex-1 py-2.5 rounded-xl font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+                  className="flex-1 py-2.5 rounded-xl font-medium bg-white/10 text-red-400 hover:bg-red-500 hover:text-white transition-colors"
                 >
                   Leave
                 </button>
@@ -1143,7 +1477,7 @@ export default function MeetingPage() {
       {/* Settings Modal */}
       <AnimatePresence>
         {isSettingsModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -1163,24 +1497,67 @@ export default function MeetingPage() {
               <div className="space-y-6">
                 <div>
                   <h3 className="text-sm font-medium text-white/60 mb-3 uppercase tracking-wider">Audio</h3>
-                  <div className="bg-black/20 border border-white/10 rounded-xl p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Mic className="w-5 h-5 text-white/60" />
-                      <span>Microphone</span>
+                  {audioDevices.length > 0 ? (
+                    <div className="bg-black/20 border border-white/10 rounded-xl p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <Mic className="w-5 h-5 text-white/60" />
+                        <span>Microphone</span>
+                      </div>
+                      <select
+                        value={selectedAudioId}
+                        onChange={(e) => setSelectedAudioId(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-blue-400/50 transition-colors"
+                      >
+                        {audioDevices.map((d) => (
+                          <option key={d.deviceId} value={d.deviceId}>
+                            {d.label || `Microphone ${audioDevices.indexOf(d) + 1}`}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <span className="text-sm text-blue-400">Default</span>
-                  </div>
+                  ) : (
+                    <div className="bg-black/20 border border-white/10 rounded-xl p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Mic className="w-5 h-5 text-white/60" />
+                        <span>Microphone</span>
+                      </div>
+                      <span className="text-sm text-white/40">No devices found</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
                   <h3 className="text-sm font-medium text-white/60 mb-3 uppercase tracking-wider">Video</h3>
-                  <div className="bg-black/20 border border-white/10 rounded-xl p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Video className="w-5 h-5 text-white/60" />
-                      <span>Camera</span>
+                  {videoDevices.length > 0 ? (
+                    <div className="bg-black/20 border border-white/10 rounded-xl p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <Video className="w-5 h-5 text-white/60" />
+                        <span>Camera</span>
+                      </div>
+                      <select
+                        value={selectedVideoId}
+                        onChange={(e) => {
+                          setSelectedVideoId(e.target.value);
+                          restartWithDevices(e.target.value);
+                        }}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-blue-400/50 transition-colors"
+                      >
+                        {videoDevices.map((d) => (
+                          <option key={d.deviceId} value={d.deviceId}>
+                            {d.label || `Camera ${videoDevices.indexOf(d) + 1}`}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <span className="text-sm text-blue-400">FaceTime HD</span>
-                  </div>
+                  ) : (
+                    <div className="bg-black/20 border border-white/10 rounded-xl p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Video className="w-5 h-5 text-white/60" />
+                        <span>Camera</span>
+                      </div>
+                      <span className="text-sm text-white/40">No devices found</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1199,7 +1576,7 @@ export default function MeetingPage() {
 }
 
 // Reusable participant tile for both speaker and grid layouts
-function ParticipantTile({ participant, keyProp }: { participant: MeetingParticipant; keyProp?: string }) {
+function ParticipantTile({ participant }: { participant: MeetingParticipant }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -1209,7 +1586,7 @@ function ParticipantTile({ participant, keyProp }: { participant: MeetingPartici
   }, [participant.stream]);
 
   return (
-    <div key={keyProp || participant.id} className="relative rounded-xl overflow-hidden bg-[#111111] border border-white/10">
+    <div className="relative rounded-xl overflow-hidden bg-[#111111] border border-white/10">
       {participant.stream ? (
         <video
           ref={videoRef}

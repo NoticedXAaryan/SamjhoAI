@@ -47,6 +47,8 @@ tmp/
 .claude/
 .antigravity/
 
+AUDIT.md
+
 # wrangler files
 .wrangler
 .dev.vars*

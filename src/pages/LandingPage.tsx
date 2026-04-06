@@ -62,7 +62,7 @@ const DynamicIslandNav = memo(() => {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => navigate('/auth')}
-              className="text-sm font-medium text-white/70 hover:text-white transition-colors hidden md:block whitespace-nowrap"
+              className="text-sm font-medium text-white/70 hover:text-white transition-colors whitespace-nowrap"
             >
               Sign In
             </button>
@@ -551,7 +551,7 @@ export default function LandingPage() {
                     </div>
 
                     {/* Live Captions */}
-                    <div className="absolute bottom-16 sm:bottom-20 left-1/2 -translate-x-1/2 w-[90%] sm:w-[80%] max-w-md">
+                    <div className="absolute bottom-14 sm:bottom-16 left-1/2 -translate-x-1/2 w-[90%] sm:w-[80%] max-w-md">
                       <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl p-2 sm:p-3 text-center shadow-2xl">
                         <p className="text-white text-xs sm:text-sm font-medium">
                           "It's so great to finally meet you!"
@@ -560,7 +560,7 @@ export default function LandingPage() {
                     </div>
 
                     {/* Controls */}
-                    <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-3 bg-black/80 backdrop-blur-xl border border-white/10 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl">
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-3 bg-black/80 backdrop-blur-xl border border-white/10 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl">
                       <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 cursor-pointer transition-colors"><Mic className="w-3 h-3 sm:w-4 sm:h-4 text-white" /></div>
                       <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 cursor-pointer transition-colors"><Video className="w-3 h-3 sm:w-4 sm:h-4 text-white" /></div>
                       <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 cursor-pointer transition-colors"><MessageSquare className="w-3 h-3 sm:w-4 sm:h-4 text-white" /></div>
