@@ -17,20 +17,19 @@ interface UserData {
 const MAX_MEETING_SIZE = 8;
 
 // Socket connection rate limiting (per IP)
-const socketConnectionMap = new Map<string, number>();
+const socketConnectionMap = new Map<string, { count: number; windowStart: number }>();
 const SOCKET_CONN_WINDOW = 60_000; // 1 min window
 const SOCKET_MAX_CONN_PER_WINDOW = 10;
 
 function checkSocketRateLimit(ip: string): boolean {
   const now = Date.now();
-  const count = socketConnectionMap.get(ip) ?? 0;
-  if (count >= SOCKET_MAX_CONN_PER_WINDOW) return false;
-  socketConnectionMap.set(ip, count + 1);
-
-  // Clean old entries
-  if (count === 0) {
-    setTimeout(() => socketConnectionMap.delete(ip), SOCKET_CONN_WINDOW);
+  const entry = socketConnectionMap.get(ip);
+  if (!entry || now - entry.windowStart > SOCKET_CONN_WINDOW) {
+    socketConnectionMap.set(ip, { count: 1, windowStart: now });
+    return true;
   }
+  if (entry.count >= SOCKET_MAX_CONN_PER_WINDOW) return false;
+  entry.count++;
   return true;
 }
 

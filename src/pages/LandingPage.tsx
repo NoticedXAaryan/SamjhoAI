@@ -605,14 +605,14 @@ export default function LandingPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[300px]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[250px] sm:auto-rows-[300px]">
           {/* Spatial Computing */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.7 }}
-            className="md:col-span-2 bg-[#0a0a0a] rounded-[2.5rem] p-10 relative overflow-hidden group border border-white/10 hover:border-white/20 transition-colors"
+            className="md:col-span-2 bg-[#0a0a0a] rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 relative overflow-hidden group border border-white/10 hover:border-white/20 transition-colors"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-[#00FFFF]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             
@@ -637,12 +637,12 @@ export default function LandingPage() {
           </motion.div>
 
           {/* Zero Latency */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.7, delay: 0.2 }}
-            className="bg-[#0a0a0a] rounded-[2.5rem] p-10 relative overflow-hidden group border border-white/10 hover:border-white/20 transition-colors"
+            className="bg-[#0a0a0a] rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 relative overflow-hidden group border border-white/10 hover:border-white/20 transition-colors"
           >
             <div className="absolute inset-0 bg-gradient-to-b from-[#FF00FF]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             
@@ -661,12 +661,12 @@ export default function LandingPage() {
           </motion.div>
 
           {/* Global Accessibility */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.7, delay: 0.1 }}
-            className="bg-[#0a0a0a] rounded-[2.5rem] p-10 relative overflow-hidden group border border-white/10 hover:border-white/20 transition-colors"
+            className="bg-[#0a0a0a] rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 relative overflow-hidden group border border-white/10 hover:border-white/20 transition-colors"
           >
             <div className="absolute inset-0 bg-gradient-to-b from-[#00FFFF]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             
@@ -684,12 +684,12 @@ export default function LandingPage() {
           </motion.div>
 
           {/* Privacy First */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.7, delay: 0.3 }}
-            className="md:col-span-2 bg-[#0a0a0a] rounded-[2.5rem] p-10 relative overflow-hidden group border border-white/10 hover:border-white/20 transition-colors"
+            className="md:col-span-2 bg-[#0a0a0a] rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 relative overflow-hidden group border border-white/10 hover:border-white/20 transition-colors"
           >
             <div className="absolute inset-0 bg-gradient-to-tr from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             

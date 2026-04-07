@@ -261,18 +261,18 @@ export default function DashboardPage() {
   // ── calendar navigation with animation ────────────────────────────
   const navigateMonth = useCallback((dir: 1 | -1) => {
     setCalendarAnimDir(dir > 0 ? 'right' : 'left');
-    if (prefersReducedMotion) {
-      setCurrentMonth(dir > 0 ? addMonths(currentMonth, 1) : subMonths(currentMonth, 1));
-      return;
-    }
-    if (!calendarRef.current) return;
-    gsap.to(calendarRef.current, {
-      opacity: 0, x: dir * -30, duration: 0.2, onComplete: () => {
-        setCurrentMonth(dir > 0 ? addMonths(currentMonth, 1) : subMonths(currentMonth, 1));
-        gsap.fromTo(calendarRef.current!, { opacity: 0, x: dir * 30 }, { opacity: 1, x: 0, duration: 0.3, ease: 'power2.out' });
-      },
+    setCurrentMonth((prev) => {
+      const next = dir > 0 ? addMonths(prev, 1) : subMonths(prev, 1);
+      if (!calendarRef.current) return next;
+      gsap.to(calendarRef.current, {
+        opacity: 0, x: dir * -30, duration: 0.2, onComplete: () => {
+          setCalendarAnimDir(_ => dir > 0 ? 'right' : 'left');
+          gsap.fromTo(calendarRef.current!, { opacity: 0, x: dir * 30 }, { opacity: 1, x: 0, duration: 0.3, ease: 'power2.out' });
+        },
+      });
+      return next;
     });
-  }, [currentMonth]);
+  }, []);
 
   // ── actions ───────────────────────────────────────────────────────
   const handleNewMeeting = async () => {
@@ -349,20 +349,17 @@ export default function DashboardPage() {
   };
 
   const handleDeleteMeeting = async (meetingId: string) => {
+    const prevUpcoming = upcomingMeetings;
+    const prevPast = pastMeetings;
+    setUpcomingMeetings(prev => prev.filter(m => m.id !== meetingId));
+    setPastMeetings(prev => prev.filter(m => m.id !== meetingId));
+    toast.success('Meeting deleted');
     try {
-      // optimistic
-      setUpcomingMeetings(prev => prev.filter(m => m.id !== meetingId));
-      setPastMeetings(prev => prev.filter(m => m.id !== meetingId));
-      toast.success('Meeting deleted');
+      await meetingsApi.cancel(meetingId);
     } catch {
       toast.error('Failed to delete meeting');
-      // reload
-      const data = await meetingsApi.list();
-      const up = data.filter(m => new Date(m.scheduledStartAt).getTime() >= Date.now() && m.status !== 'COMPLETED')
-        .sort((a, b) => new Date(a.scheduledStartAt).getTime() - new Date(b.scheduledStartAt).getTime());
-      const pa = data.filter(m => new Date(m.scheduledStartAt).getTime() < Date.now() || m.status === 'COMPLETED')
-        .sort((a, b) => new Date(b.scheduledStartAt).getTime() - new Date(a.scheduledStartAt).getTime());
-      setUpcomingMeetings(up); setPastMeetings(pa);
+      setUpcomingMeetings(prevUpcoming);
+      setPastMeetings(prevPast);
     }
   };
 
@@ -442,7 +439,7 @@ export default function DashboardPage() {
 
   /* ── render ───────────────────────────────────────────────────── */
   return (
-    <div className="h-screen w-full bg-gradient-to-br from-slate-900 via-[#050507] to-slate-900 text-white font-sans flex overflow-hidden selection:bg-white/30">
+    <div className="h-[100dvh] w-full bg-gradient-to-br from-slate-900 via-[#050507] to-slate-900 text-white font-sans flex flex-col overflow-hidden selection:bg-white/30">
       {/* Background glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-blue-500/10 blur-[120px] rounded-full pointer-events-none" />
 

@@ -76,9 +76,8 @@ export default function AuthPage() {
         const res = await authApi.register({ firstName, lastName, email, password });
         auth.setTokens(res.accessToken, res.refreshToken);
         auth.setUser({ ...res.user, emailVerified: res.user.emailVerified });
-        setRegisteredEmail(email);
-        setView('email-sent');
-        setLoading(false);
+        // Already logged in — go straight to dashboard
+        navigate('/dashboard');
         return;
       }
       navigate('/dashboard');
@@ -131,25 +130,12 @@ export default function AuthPage() {
 
   /* Resend verification */
   const handleResendVerification = async () => {
-    setError('');
     try {
       await authApi.sendVerification();
-      setError('');
-      toastInfo('Verification email sent');
     } catch {
-      toastError('Failed to resend email');
+      setError('Failed to resend email');
     }
   };
-
-  /* Toast mini-helpers */
-  const [toastMsg, setToastMsg] = useState('');
-  const toastInfo = (m: string) => { setToastMsg(m); setTimeout(() => setToastMsg(''), 3000); };
-  const toastError = (m: string) => { setError(m); };
-
-  /* Success toast banner */
-  const successToast = search.get('verified') === 'true' || view === 'verify-success'
-    ? 'Email verified! You can now log in.'
-    : '';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#050507] to-slate-900 text-white font-sans flex flex-col items-center justify-center p-6 relative overflow-hidden">
@@ -175,24 +161,6 @@ export default function AuthPage() {
           <span className="text-xl font-semibold tracking-tight text-white">Samjho AI</span>
         </div>
 
-        {/* Success toast from email verify */}
-        <AnimatePresence>
-          {successToast && (
-            <motion.div
-              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-              animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
-              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm rounded-xl p-3">
-                <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
-                <span>{successToast}</span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* ──────────── VERIFICATION SUCCESS ──────────── */}
         {view === 'verify-success' && (
           <div className="text-center space-y-6">
             <CheckCircle2 className="w-16 h-16 mx-auto text-emerald-400" />
@@ -208,9 +176,9 @@ export default function AuthPage() {
         {view === 'email-sent' && (
           <div className="text-center space-y-6">
             <ShieldCheck className="w-16 h-16 mx-auto text-blue-400" />
-            <h1 className="text-2xl font-semibold">Check your terminal</h1>
-            <p className="text-[#86868b]">A link for <strong className="text-white">{registeredEmail}</strong> has been logged to your dev server console. Copy the link and open it in your browser.</p>
-            {registeredEmail && (
+            <h1 className="text-2xl font-semibold">Check your email</h1>
+            <p className="text-[#86868b]">We've sent a link to <strong className="text-white">{registeredEmail}</strong>. It should arrive within a few minutes.</p>
+            {registeredEmail && auth.isLoggedIn() && (
               <button onClick={handleResendVerification} className="text-blue-400 text-sm hover:text-blue-300 transition-colors">
                 Didn't receive it? Resend
               </button>
@@ -289,14 +257,6 @@ export default function AuthPage() {
 
             <AnimatePresence>
               {error && <ErrorAlert msg={error} />}
-            </AnimatePresence>
-
-            <AnimatePresence>
-              {toastMsg && (
-                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-4 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm rounded-xl p-3 text-center">
-                  {toastMsg}
-                </motion.div>
-              )}
             </AnimatePresence>
 
             <form className="space-y-4" onSubmit={handleAuth} noValidate onChange={() => setError('')}>

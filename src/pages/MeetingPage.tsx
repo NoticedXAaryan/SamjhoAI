@@ -372,12 +372,14 @@ export default function MeetingPage() {
     if (!hasJoined) return;
 
     const token = auth.getAccessToken();
-    const socket = io(window.location.origin, {
+    const apiBase = import.meta.env.VITE_API_URL ?? '';
+    const socketUrl = apiBase || window.location.origin;
+    const socket = io(socketUrl, {
       auth: { accessToken: token },
       reconnection: true,
-      reconnectionAttempts: 20,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 10000,
     });
     socketRef.current = socket;
 
@@ -547,6 +549,7 @@ export default function MeetingPage() {
     });
 
     // Host ended the meeting for everyone
+    const navTimeouts: ReturnType<typeof setTimeout>[] = [];
     socket.on('meeting-ended', ({ reason }: { reason: string }) => {
       toast.error(reason === 'host-ended' ? 'The host ended the meeting' : 'The meeting has ended', {
         duration: 4000,
@@ -557,7 +560,8 @@ export default function MeetingPage() {
       peerConnectionsRef.current.clear();
       remoteStreamsRef.current.clear();
       setParticipants([]);
-      setTimeout(() => navigate('/dashboard'), 3000);
+      const t = setTimeout(() => navigate('/dashboard'), 3000);
+      navTimeouts.push(t);
     });
 
     // Meeting is full
@@ -565,15 +569,16 @@ export default function MeetingPage() {
       toast.error(`Meeting is full (max ${max} participants)`, { duration: 5000 });
       setHasJoined(false);
       socket.disconnect();
-      navigate('/dashboard');
+      const t = setTimeout(() => navigate('/dashboard'), 0);
+      navTimeouts.push(t);
     });
 
     return () => {
+      navTimeouts.forEach(clearTimeout);
       peerConnectionsRef.current.forEach((pc) => pc.close());
       peerConnectionsRef.current.clear();
       remoteStreamsRef.current.clear();
-      // Clean up all speaking analysers
-      participants.forEach((p) => unregisterSpeakingAnalyser(p.id));
+      // Speaking analysers are cleaned up in useMeetingMedia on unmount
       socket.disconnect();
     };
   }, [meetingId, hasJoined]);
@@ -684,9 +689,9 @@ export default function MeetingPage() {
 
   if (meetingEnded) {
     return (
-      <div className="h-screen w-full bg-[#050507] text-white flex flex-col items-center justify-center font-sans selection:bg-[#00FFFF]/30 p-6">
-        <div className="max-w-md w-full bg-[#0a0a0a] border border-white/10 rounded-3xl p-8 text-center shadow-2xl">
-          <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
+      <div className="h-[100dvh] w-full bg-[#050507] text-white flex flex-col items-center justify-center font-sans selection:bg-[#00FFFF]/30 p-4 sm:p-6">
+        <div className="max-w-md w-full bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 sm:p-8 text-center shadow-2xl">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="w-10 h-10 text-[#00FFFF]" />
           </div>
           <h1 className="text-3xl font-semibold mb-2">You left the meeting</h1>
@@ -729,14 +734,14 @@ export default function MeetingPage() {
 
   if (!hasJoined) {
     return (
-      <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-[#050507] to-slate-900 text-white flex items-center justify-center p-4 md:p-8 font-sans selection:bg-white/30">
-        <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-5 gap-8 items-center">
+      <div className="min-h-[100dvh] w-full bg-gradient-to-br from-slate-900 via-[#050507] to-slate-900 text-white flex items-center justify-center p-4 md:p-8 font-sans selection:bg-white/30">
+        <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8 items-center">
 
           {/* Video Grid Area */}
           <div className="lg:col-span-3 aspect-video bg-black/40 backdrop-blur-xl rounded-[2rem] border border-white/10 relative overflow-hidden flex flex-col items-center justify-center shadow-2xl">
             {isVideoOff ? (
-              <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center">
-                <User className="w-10 h-10 text-white/40" />
+              <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-white/5 flex items-center justify-center">
+                <User className="w-8 h-8 sm:w-10 sm:h-10 text-white/40" />
               </div>
             ) : (
               <video
@@ -901,16 +906,16 @@ export default function MeetingPage() {
   }, [participants]);
 
   return (
-    <div className="h-screen w-full bg-[#050507] text-white overflow-hidden flex flex-col font-sans selection:bg-[#00FFFF]/30">
+    <div className="h-[100dvh] w-full bg-[#050507] text-white overflow-hidden flex flex-col font-sans selection:bg-[#00FFFF]/30">
 
       {/* Top Bar */}
-      <header className="h-14 border-b border-white/10 bg-[#0a0a0a] flex items-center justify-between px-4 shrink-0 z-30">
-        <div className="flex items-center gap-3">
-          <span className="text-white/40 text-sm font-mono">{formatTime(elapsedSeconds)}</span>
-          <span className="text-white/80 text-sm font-medium truncate max-w-xs">{meetingTitleRef.current}</span>
+      <header className="h-14 border-b border-white/10 bg-[#0a0a0a] flex items-center justify-between px-2 sm:px-4 shrink-0 z-30">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="text-white/40 text-xs sm:text-sm font-mono">{formatTime(elapsedSeconds)}</span>
+          <span className="text-white/80 text-xs sm:text-sm font-medium truncate max-w-[8rem] sm:max-w-xs">{meetingTitleRef.current}</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* Connection status badge */}
           <div className={cn(
             "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
@@ -1028,9 +1033,9 @@ export default function MeetingPage() {
               </div>
 
               {/* Bottom Strip (Other Participants + Self View) */}
-              <div className="h-32 sm:h-40 shrink-0 flex gap-3 overflow-x-auto px-1 pb-1">
+              <div className="h-24 sm:h-40 shrink-0 flex gap-2 sm:gap-3 overflow-x-auto px-1 pb-1">
                 {/* Self View */}
-                <div className="w-48 sm:w-64 min-w-[12rem] sm:min-w-[16rem] relative rounded-xl overflow-hidden bg-[#111111] border-2 border-blue-500/30 shadow-lg shrink-0">
+                <div className="w-36 sm:w-64 min-w-[9rem] sm:min-w-[16rem] relative rounded-xl overflow-hidden bg-[#111111] border-2 border-blue-500/30 shadow-lg shrink-0">
                   {isVideoOff ? (
                     <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a]">
                       <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 flex items-center justify-center text-xl font-bold">
@@ -1123,7 +1128,7 @@ export default function MeetingPage() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 320, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="absolute right-0 top-0 bottom-0 w-80 bg-[#0a0a0a] border-l border-white/10 flex flex-col z-20"
+              className="fixed right-0 top-0 bottom-0 w-full sm:w-80 bg-[#0a0a0a] border-l border-white/10 flex flex-col z-40"
             >
               <div className="h-14 border-b border-white/10 flex items-center justify-between px-4 shrink-0">
                 <h2 className="font-semibold capitalize">{activeTab}</h2>
@@ -1260,123 +1265,114 @@ export default function MeetingPage() {
       </div>
 
       {/* Bottom Control Bar */}
-      <footer className="h-20 bg-black/40 backdrop-blur-xl border-t border-white/10 flex items-center justify-between px-6 shrink-0 z-30">
-
-        {/* Left: Settings/Info */}
-        <div className="w-1/3 flex items-center gap-2">
-          <button
-            onClick={() => setIsSettingsModalOpen(true)}
-            className="p-2.5 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setIsInfoModalOpen(true)}
-            className="p-2.5 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
-          >
-            <Info className="w-5 h-5" />
-          </button>
-        </div>
+      <footer className="h-auto sm:h-20 bg-black/40 backdrop-blur-xl border-t border-white/10 flex flex-col sm:flex-row items-center sm:items-center justify-between px-3 sm:px-6 py-2 sm:py-0 shrink-0 z-30 gap-2">
 
         {/* Center: Primary Controls */}
-        <div className="flex items-center justify-center gap-3 w-1/3">
+        <div className="flex items-center justify-center gap-2 sm:gap-3 order-1 sm:order-2">
           <button
             onClick={toggleMute}
             className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200",
+              "w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-200",
               isMuted ? "bg-red-500 text-white hover:bg-red-600" : "bg-white/10 text-white hover:bg-white/20"
             )}
           >
-            {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            {isMuted ? <MicOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Mic className="w-4 h-4 sm:w-5 sm:h-5" />}
           </button>
 
           <button
             onClick={toggleVideo}
             className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200",
+              "w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-200",
               isVideoOff ? "bg-red-500 text-white hover:bg-red-600" : "bg-white/10 text-white hover:bg-white/20"
             )}
           >
-            {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+            {isVideoOff ? <VideoOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Video className="w-4 h-4 sm:w-5 sm:h-5" />}
           </button>
 
           <button
             onClick={toggleScreenShare}
             className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200",
+              "w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-200",
               isScreenSharing ? "bg-blue-500 text-white ring-2 ring-blue-400" : "bg-white/10 text-white hover:bg-white/20"
             )}
+            title="Share Screen"
           >
-            <MonitorUp className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={() => {
-              setIsHandRaised(!isHandRaised);
-              toast.info(!isHandRaised ? 'Hand raised' : 'Hand lowered', { duration: 1500 });
-            }}
-            className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200",
-              isHandRaised ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-white/10 text-white hover:bg-white/20"
-            )}
-          >
-            <Hand className="w-5 h-5" />
+            <MonitorUp className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
           <button
             onClick={() => setIsLeaveModalOpen(true)}
-            className="w-16 h-12 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors ml-2"
+            className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors sm:ml-2"
             title="Leave Meeting"
           >
-            <PhoneOff className="w-5 h-5" />
+            <PhoneOff className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
+        </div>
+
+        {/* Left: Settings/Info */}
+        <div className="flex items-center gap-1 order-2 sm:order-1 sm:w-1/3">
+          <button
+            onClick={() => setIsSettingsModalOpen(true)}
+            className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+            title="Settings"
+          >
+            <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
+          <button
+            onClick={() => setIsInfoModalOpen(true)}
+            className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+            title="Meeting Info"
+          >
+            <Info className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* Right: AI Toggle & Sidebar Controls */}
-        <div className="w-1/3 flex items-center justify-end gap-3">
+        <div className="flex items-center justify-end gap-1 sm:gap-3 order-3 sm:w-1/3">
           {/* AI Translation Toggle */}
           <button
             onClick={() => { setIsAiActive(!isAiActive); toast.info(isAiActive ? 'AI features disabled' : 'AI features enabled', { duration: 1500 }); }}
             className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-all duration-300 border",
+              "flex items-center gap-1.5 px-2 sm:px-4 py-1.5 sm:py-2 rounded-xl font-medium text-xs sm:text-sm transition-all duration-300 border",
               isAiActive
                 ? "bg-blue-500/20 border-blue-500/50 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]"
                 : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white"
             )}
           >
-            <Sparkles className="w-4 h-4" />
-            {isAiActive ? "AI Active" : "AI Off"}
+            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">{isAiActive ? "AI Active" : "AI Off"}</span>
           </button>
-
-          <div className="w-px h-8 bg-white/10 mx-1" />
 
           {/* Sidebar Toggles */}
           <button
             onClick={() => setActiveTab(activeTab === 'participants' ? null : 'participants')}
             className={cn(
-              "p-2.5 rounded-xl transition-colors",
+              "p-2 rounded-xl transition-colors",
               activeTab === 'participants' ? "bg-blue-500/20 text-blue-400" : "text-white/60 hover:text-white hover:bg-white/10"
             )}
+            title="Participants"
           >
-            <Users className="w-5 h-5" />
+            <Users className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <button
             onClick={() => setActiveTab(activeTab === 'chat' ? null : 'chat')}
             className={cn(
-              "p-2.5 rounded-xl transition-colors",
+              "p-2 rounded-xl transition-colors",
               activeTab === 'chat' ? "bg-blue-500/20 text-blue-400" : "text-white/60 hover:text-white hover:bg-white/10"
             )}
+            title="Chat"
           >
-            <MessageSquare className="w-5 h-5" />
+            <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <button
             onClick={() => setActiveTab(activeTab === 'transcript' ? null : 'transcript')}
             className={cn(
-              "p-2.5 rounded-xl transition-colors",
+              "p-2 rounded-xl transition-colors",
               activeTab === 'transcript' ? "bg-blue-500/20 text-blue-400" : "text-white/60 hover:text-white hover:bg-white/10"
             )}
+            title="Transcript"
           >
-            <FileText className="w-5 h-5" />
+            <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 

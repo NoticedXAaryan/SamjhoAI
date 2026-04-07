@@ -52,18 +52,6 @@ export interface HandResult {
   gesture: string;
 }
 
-// Known ASL sign detection using geometric rules on 21 hand landmarks.
-// Landmark indices (MediaPipe standard):
-// 0=wrist, 1-4=thumb, 5-8=index, 9-12=middle, 13-16=ring, 17-20=pinky
-const HAND_CONNECTIONS: [number, number][] = [
-  [0,1],[1,2],[2,3],[3,4],       // thumb
-  [0,5],[5,6],[6,7],[7,8],       // index
-  [0,9],[9,10],[10,11],[11,12],  // middle
-  [0,13],[13,14],[14,15],[15,16],// ring
-  [0,17],[17,18],[18,19],[19,20],// pinky
-  [5,9],[9,13],[13,17],          // palm bases
-];
-
 function distance3d(a: HandLandmark, b: HandLandmark): number {
   return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2);
 }
@@ -188,7 +176,6 @@ export function useMeetingMedia(isAiActive: boolean) {
 
   const analysersRef = useRef<Map<string, { stop: () => void; detectSpeaking: () => boolean }>>(new Map());
   const mediaPipeRef = useRef<any>(null);
-  const imageClassifierRef = useRef<any>(null);
   const animationFrameRef = useRef<number>(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -333,10 +320,18 @@ export function useMeetingMedia(isAiActive: boolean) {
     const { stop, detectSpeaking } = createSpeakingAnalyser(stream);
     let rafId = 0;
 
+    // Store analyser so check() and unregister can find it
+    const entry = {
+      stop: () => {
+        cancelAnimationFrame(rafId);
+        stop();
+      },
+      detectSpeaking,
+    };
+    analysersRef.current.set(peerId, entry);
+
     // Poll for speaking state
     let lastSpeakingTime = 0;
-    if (!analysersRef.current.has(peerId)) return;
-
     const check = () => {
       const analyser = analysersRef.current.get(peerId);
       if (!analyser) return;
@@ -360,15 +355,6 @@ export function useMeetingMedia(isAiActive: boolean) {
       rafId = requestAnimationFrame(check);
     };
     rafId = requestAnimationFrame(check);
-
-    // Store rafId so it can be cancelled on unregister
-    analysersRef.current.set(peerId, {
-      stop: () => {
-        cancelAnimationFrame(rafId);
-        stop();
-      },
-      detectSpeaking,
-    });
   }, []);
 
   const unregisterSpeakingAnalyser = useCallback((peerId: string) => {

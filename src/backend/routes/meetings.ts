@@ -6,7 +6,6 @@ import { requireAuth } from '../middleware/auth.js';
 const router = Router();
 
 const createSchema = z.object({
-  id: z.string().optional(),
   title: z.string().min(1).default('Instant Meeting'),
   date: z.string().optional(),
   time: z.string().optional(),
@@ -73,7 +72,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
 });
 
 // GET /api/meetings/:id — get a single meeting
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', requireAuth, async (req: Request, res: Response) => {
   const meeting = await prisma.meeting.findUnique({
     where: { id: req.params.id },
     include: {
@@ -113,7 +112,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response) => {
 });
 
 // GET /api/meetings/:id/participants — list meeting participants
-router.get('/:id/participants', async (req: Request, res: Response) => {
+router.get('/:id/participants', requireAuth, async (req: Request, res: Response) => {
   const participants = await prisma.participant.findMany({
     where: { meetingId: req.params.id },
     include: { user: { select: { id: true, name: true } } },
@@ -124,7 +123,7 @@ router.get('/:id/participants', async (req: Request, res: Response) => {
 });
 
 // GET /api/meetings/:id/messages — load chat message history
-router.get('/:id/messages', async (req: Request, res: Response) => {
+router.get('/:id/messages', requireAuth, async (req: Request, res: Response) => {
   const messages = await prisma.message.findMany({
     where: { meetingId: req.params.id },
     orderBy: { createdAt: 'asc' },

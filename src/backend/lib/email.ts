@@ -1,7 +1,12 @@
 import nodemailer from 'nodemailer';
 import { env } from '../config/env.js';
+import { verificationEmailTemplate, passwordResetEmailTemplate, devVerificationLink } from './email-templates.js';
 
 let transporter: nodemailer.Transporter | null = null;
+
+function hasTransportConfigured(): boolean {
+  return !!(env.EMAIL_RESEND_API_KEY || env.SMTP_HOST);
+}
 
 function getTransporter(): nodemailer.Transporter {
   if (!transporter) {
@@ -21,17 +26,9 @@ function getTransporter(): nodemailer.Transporter {
           ? { user: env.SMTP_USER, pass: env.SMTP_PASS }
           : undefined,
       });
-    } else {
-      transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false,
-        auth: { user: 'dev', pass: 'samjho' },
-      });
-      console.log('[Email] Using Ethereal test transport (dev mode)');
     }
   }
-  return transporter;
+  return transporter!;
 }
 
 // Verified senders — use onboarding@resend.dev by default until a domain is verified on Resend dashboard
@@ -39,10 +36,14 @@ const SENDER = env.EMAIL_FROM || 'onboarding@resend.dev';
 const REPLY_TO = env.EMAIL_FROM ? null : 'noreply@samjho.ai';
 
 export function logEmailLinkDev(type: 'verify' | 'reset', email: string, link: string, label: string): void {
-  console.log(`[Email] 🔗 ${label} link for ${email}: ${link}`);
+  console.log(devVerificationLink(email, email, link, type === 'verify' ? 'Verify Email' : 'Reset Password'));
 }
 
 async function sendMail(to: string, subject: string, html: string): Promise<boolean> {
+  if (!hasTransportConfigured()) {
+    console.error('[Email] No email provider configured — cannot send email');
+    return false;
+  }
   const transport = getTransporter();
   try {
     const info = await transport.sendMail({
@@ -56,37 +57,24 @@ async function sendMail(to: string, subject: string, html: string): Promise<bool
     return true;
   } catch (err: unknown) {
     console.error('[Email] Failed:', err instanceof Error ? err.message : String(err));
-    // In dev, try to continue; in prod, return false so caller can react
-    return env.NODE_ENV === 'development';
+    return false;
   }
 }
 
-const APP_ORIGIN = process.env.APP_ORIGIN || 'http://localhost:3000';
+const APP_ORIGIN = env.APP_ORIGIN;
 
 export async function sendVerificationEmail(email: string, name: string, token: string): Promise<boolean> {
-  const link = `${APP_ORIGIN}/auth?verified=true&token=${token}`;
   return sendMail(
     email,
     'Samjho — Verify your email',
-    `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:auto;padding:2rem;text-align:center">
-      <h2 style="margin:0 0 .5rem">Hi ${name}!</h2>
-      <p style="color:#666;margin:0 0 1.5rem">Click the button below to verify your email address on Samjho.</p>
-      <a href="${link}" style="display:inline-block;background:#2563eb;color:#fff;padding:.75rem 1.5rem;border-radius:12px;text-decoration:none;font-weight:600">Verify Email</a>
-      <p style="color:#999;font-size:12px;margin-top:1.5rem">If you didn't create this account, ignore this email. This link never expires.</p>
-    </div>`,
+    verificationEmailTemplate(name, token, APP_ORIGIN),
   );
 }
 
 export async function sendPasswordResetEmail(email: string, token: string): Promise<boolean> {
-  const link = `${APP_ORIGIN}/auth?reset=true&resetToken=${token}`;
   return sendMail(
     email,
     'Samjho — Reset your password',
-    `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:auto;padding:2rem;text-align:center">
-      <h2 style="margin:0 0 .5rem">Reset your password</h2>
-      <p style="color:#666;margin:0 0 1.5rem">Click the button below to choose a new password. This link expires in 30 minutes.</p>
-      <a href="${link}" style="display:inline-block;background:#ef4444;color:#fff;padding:.75rem 1.5rem;border-radius:12px;text-decoration:none;font-weight:600">Reset Password</a>
-      <p style="color:#999;font-size:12px;margin-top:1.5rem">If you didn't request this, ignore it.</p>
-    </div>`,
+    passwordResetEmailTemplate(token, APP_ORIGIN),
   );
 }

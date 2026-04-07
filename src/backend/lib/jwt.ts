@@ -19,9 +19,9 @@ export function signRefresh(payload: TokenPayload): string {
 }
 
 export function verifyAccess(token: string): TokenPayload {
-  return jwt.verify(token, env.JWT_SECRET) as TokenPayload;
+  return jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'], maxAge: '15m' }) as TokenPayload;
 }
 
 export function verifyRefresh(token: string): TokenPayload {
-  return jwt.verify(token, env.JWT_REFRESH_SECRET) as TokenPayload;
+  return jwt.verify(token, env.JWT_REFRESH_SECRET, { algorithms: ['HS256'] }) as TokenPayload;
 }

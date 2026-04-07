@@ -2,12 +2,15 @@
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
 // ── Token storage ─────────────────────────────────────────────────────────────
+let refreshPromise: Promise<string> | null = null;
+
 export const auth = {
   getAccessToken: () => localStorage.getItem('accessToken'),
   getRefreshToken: () => localStorage.getItem('refreshToken'),
   setTokens: (access: string, refresh: string) => {
     localStorage.setItem('accessToken', access);
     localStorage.setItem('refreshToken', refresh);
+    refreshPromise = null; // Reset so next expiry triggers a new refresh
   },
   setUser: (user: User) => localStorage.setItem('user', JSON.stringify(user)),
   getUser: (): User | null => {
@@ -18,6 +21,7 @@ export const auth = {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
+    refreshPromise = null;
   },
   isLoggedIn: () => !!localStorage.getItem('accessToken'),
 };
@@ -35,22 +39,34 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
 
   if (res.status === 401) {
-    // Try refresh
     const refreshToken = auth.getRefreshToken();
     if (refreshToken) {
-      const refreshRes = await fetch(`${BASE}/api/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      });
-      if (refreshRes.ok) {
-        const { accessToken } = await refreshRes.json();
-        auth.setTokens(accessToken, refreshToken);
-        headers['Authorization'] = `Bearer ${accessToken}`;
-        const retry = await fetch(`${BASE}${path}`, { ...options, headers });
-        if (!retry.ok) throw new Error(await retry.text());
-        return retry.json();
+      // Refresh only once — concurrent 401s all wait on the same promise
+      try {
+        if (!refreshPromise) {
+          refreshPromise = (async () => {
+            const refreshRes = await fetch(`${BASE}/api/auth/refresh`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refreshToken }),
+            });
+            if (!refreshRes.ok) throw new Error('Refresh failed');
+            const { accessToken } = await refreshRes.json();
+            auth.setTokens(accessToken, refreshToken);
+            return accessToken;
+          })();
+        }
+        await refreshPromise;
+      } catch {
+        auth.clear();
+        window.location.href = '/auth';
+        throw new Error('Session expired');
       }
+      // Retry with fresh token
+      headers['Authorization'] = `Bearer ${auth.getAccessToken()}`;
+      const retry = await fetch(`${BASE}${path}`, { ...options, headers });
+      if (!retry.ok) throw new Error(await retry.text());
+      return retry.json();
     }
     auth.clear();
     window.location.href = '/auth';
@@ -72,10 +88,6 @@ export interface User {
   email: string;
   emailVerified?: boolean;
   avatarId?: number;
-}
-
-export interface UserExtended extends User {
-  createdAt: string;
 }
 
 export interface Meeting {

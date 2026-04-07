@@ -89,9 +89,10 @@ router.post('/register', async (req: Request, res: Response) => {
     const link = `${env.APP_ORIGIN}/auth?verified=true&token=${verificationToken}`;
     logEmailLinkDev('verify', user.email, link, 'Verify Email');
   }
-  sendVerificationEmail(email, user.name, verificationToken).catch((e) =>
-    console.log('[Auth] Email send failed (non-blocking):', e.message),
-  );
+  const emailOk = await sendVerificationEmail(email, user.name, verificationToken);
+  if (!emailOk) {
+    console.error('[Auth] Verification email failed for', user.email);
+  }
 
   const payload = { userId: user.id, email: user.email };
   res.status(201).json({
@@ -195,16 +196,18 @@ router.post('/send-verification', requireAuth, async (req: Request, res: Respons
     res.json({ success: true, message: 'Email already verified' });
     return;
   }
-  const token = user.emailVerificationToken || crypto.randomBytes(32).toString('hex');
-  if (!user.emailVerificationToken) {
-    await prisma.user.update({ where: { id: user.id }, data: { emailVerificationToken: token } });
-  }
+  const token = crypto.randomBytes(32).toString('hex');
+  await prisma.user.update({ where: { id: user.id }, data: { emailVerificationToken: token } });
 
   if (env.NODE_ENV === 'development') {
     const link = `${env.APP_ORIGIN}/auth?verified=true&token=${token}`;
     logEmailLinkDev('verify', user.email, link, 'Verify Email');
   }
-  await sendVerificationEmail(user.email, user.name, token);
+  const emailOk = await sendVerificationEmail(user.email, user.name, token);
+  if (!emailOk) {
+    res.status(502).json({ error: 'Failed to send verification email' });
+    return;
+  }
   res.json({ success: true });
 });
 
@@ -249,8 +252,12 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
       const link = `${env.APP_ORIGIN}/auth?reset=true&resetToken=${token}`;
       logEmailLinkDev('reset', user.email, link, 'Reset Password');
     }
-    await sendPasswordResetEmail(email, token);
+    const emailOk = await sendPasswordResetEmail(email, token);
+    if (!emailOk) {
+      console.error('[Auth] Password reset email failed for', user.email);
+    }
   }
+  // Always return success to prevent email enumeration
   res.json({ success: true });
 });
 
