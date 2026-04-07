@@ -2,28 +2,11 @@ import { createBackend } from './src/backend/index.js';
 import { env } from './src/backend/config/env.js';
 import { prisma } from './src/backend/lib/prisma.js';
 
-async function waitForDB(maxRetries = 10, delayMs = 3000) {
-  if (env.NODE_ENV === 'production') {
-    console.log('[Samjho] Waiting for database connection...');
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        await prisma.$queryRaw`SELECT 1`;
-        console.log('[Samjho] Database connected successfully');
-        return;
-      } catch (err) {
-        if (i === maxRetries - 1) {
-          console.error('[Samjho] Database connection failed after', maxRetries, 'retries');
-          throw err;
-        }
-        console.log(`[Samjho] Database not ready (attempt ${i + 1}/${maxRetries}), retrying in ${delayMs}ms...`);
-        await new Promise((r) => setTimeout(r, delayMs));
-      }
-    }
-  }
+async function connectDB() {
+  await prisma.$queryRaw`SELECT 1`;
 }
 
 async function startServer() {
-  await waitForDB();
   const { app, httpServer, io } = createBackend();
 
   if (env.NODE_ENV !== 'production') {
@@ -52,9 +35,24 @@ async function startServer() {
     });
   }
 
+  // Start server immediately — health checks respond /health right away
   httpServer.listen(env.PORT, '0.0.0.0', () => {
-    console.log(`[Samjho] Server running on http://localhost:${env.PORT} (${env.NODE_ENV})`);
+    console.log(`[Samjho] Server running on http://0.0.0.0:${env.PORT} (${env.NODE_ENV})`);
   });
+
+  // Connect to DB in background (non-blocking)
+  connectDB()
+    .then(() => {
+      console.log('[Samjho] Database connected successfully');
+    })
+    .catch((err) => {
+      console.error('[Samjho] Database unavailable — check DATABASE_URL env var');
+      console.error('[Samjho] Details:', err.message);
+      if (env.NODE_ENV === 'production') {
+        // Don't crash the process — the server can still serve static files and show errors
+        console.log('[Samjho] Server is running, but API routes will fail until DB connects');
+      }
+    });
 
   // ── Graceful shutdown ───────────────────────────────────────────────
   async function shutdownSignal() {

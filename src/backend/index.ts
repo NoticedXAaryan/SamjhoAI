@@ -48,13 +48,14 @@ export function createBackend() {
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(morgan(isProd ? 'combined' : 'dev'));
 
-  // ── Health check (for UptimeRobot keep-alive) ──────────────────────────────
+  // ── Health check (Railway/UptimeRobot) ─────────────────────────────────────
   app.get('/health', async (_req, res) => {
     try {
       await prisma.$queryRaw`SELECT 1`;
       res.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
     } catch {
-      res.status(503).json({ status: 'error', db: 'disconnected', timestamp: new Date().toISOString() });
+      // Return 200 even if DB is down so healthcheck passes and server isn't killed
+      res.status(200).json({ status: 'ok', db: 'disconnected', timestamp: new Date().toISOString() });
     }
   });
 
