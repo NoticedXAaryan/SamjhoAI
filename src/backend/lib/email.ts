@@ -28,11 +28,15 @@ function getTransporter(): nodemailer.Transporter {
         secure: false,
         auth: { user: 'dev', pass: 'samjho' },
       });
-      console.log('[Email] Using Ethereal test transport (dev mode); check console for the OTP');
+      console.log('[Email] Using Ethereal test transport (dev mode)');
     }
   }
   return transporter;
 }
+
+// Verified senders — use onboarding@resend.dev by default until a domain is verified on Resend dashboard
+const SENDER = env.EMAIL_FROM || 'onboarding@resend.dev';
+const REPLY_TO = env.EMAIL_FROM ? null : 'noreply@samjho.ai';
 
 export function logEmailLinkDev(type: 'verify' | 'reset', email: string, link: string, label: string): void {
   console.log(`[Email] 🔗 ${label} link for ${email}: ${link}`);
@@ -41,19 +45,19 @@ export function logEmailLinkDev(type: 'verify' | 'reset', email: string, link: s
 async function sendMail(to: string, subject: string, html: string): Promise<boolean> {
   const transport = getTransporter();
   try {
-    const info = await transport.sendMail({ from: env.EMAIL_FROM, to, subject, html });
-    if (env.NODE_ENV === 'development') {
-      const preview = nodemailer.getTestMessageUrl(info);
-      if (preview) console.log(`[Email] Preview: ${preview}`);
-    }
+    const info = await transport.sendMail({
+      from: SENDER,
+      ...(REPLY_TO ? { replyTo: REPLY_TO } : {}),
+      to,
+      subject,
+      html,
+    });
+    console.log(`[Email] Sent "${subject}" to ${to} (resend.com/${info.messageId})`);
     return true;
-  } catch (err) {
-    if (env.NODE_ENV === 'development') {
-      console.log('[Email] Failed (dev mode, continuing):', err);
-      return true;
-    }
-    console.error('[Email] Send failed:', err);
-    return false;
+  } catch (err: unknown) {
+    console.error('[Email] Failed:', err instanceof Error ? err.message : String(err));
+    // In dev, try to continue; in prod, return false so caller can react
+    return env.NODE_ENV === 'development';
   }
 }
 
