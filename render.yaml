@@ -4,10 +4,12 @@ services:
     runtime: node
     region: oregon
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && npm run build:frontend
     startCommand: NODE_ENV=production tsx server.ts
     healthCheckPath: /health
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: APP_ORIGIN
         sync: false
       - key: DATABASE_URL
@@ -16,5 +18,9 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
       - key: EMAIL_RESEND_API_KEY
         sync: false

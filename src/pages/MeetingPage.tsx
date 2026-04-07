@@ -116,6 +116,7 @@ export default function MeetingPage() {
   // Track socket connection state for reconnection recovery
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const reconnectAttemptsRef = useRef(0);
+  const isCleaningUpRef = useRef(false);
 
   // WebRTC ICE servers fetched from backend (supports dynamic TURN)
   const iceServersRef = useRef<RTCIceServer[]>([]);
@@ -205,6 +206,7 @@ export default function MeetingPage() {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(true);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [cleaningUp, setCleaningUp] = useState(false);
   const meetingLink = window.location.href;
   const meetingTitleRef = useRef('Meeting');
 
@@ -430,6 +432,8 @@ export default function MeetingPage() {
 
     socket.on('disconnect', (reason) => {
       setIsSocketConnected(false);
+      // Never auto-reconnect when we're intentionally cleaning up
+      if (isCleaningUpRef.current) return;
       if (reason === 'io server disconnect' || reason === 'io client disconnect') {
         // Server or client initiated disconnect — manual reconnect needed
         socket.connect();
@@ -675,10 +679,9 @@ export default function MeetingPage() {
   // Send chat message
   const sendChatMessage = useCallback(() => {
     if (!chatInput.trim() || !socketRef.current) return;
-    const name = userName || 'Guest User';
-    socketRef.current.emit('chat-message', meetingId, { text: chatInput.trim(), senderName: name });
+    socketRef.current.emit('chat-message', meetingId, { text: chatInput.trim() });
     setChatInput('');
-  }, [chatInput, meetingId, userName]);
+  }, [chatInput, meetingId]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -708,8 +711,10 @@ export default function MeetingPage() {
                 peerConnectionsRef.current.forEach((pc) => pc.close());
                 peerConnectionsRef.current.clear();
                 remoteStreamsRef.current.clear();
-                socketRef.current?.disconnect();
+                try { socketRef.current?.disconnect(); } catch { /* already disconnected */ }
 
+                isCleaningUpRef.current = false;
+                setCleaningUp(false);
                 setMeetingEnded(false);
                 setHasJoined(false);
                 setElapsedSeconds(0);
@@ -890,6 +895,8 @@ export default function MeetingPage() {
 
   // Leave meeting (just disconnect local user)
   const leaveMeeting = useCallback(() => {
+    isCleaningUpRef.current = true;
+    setCleaningUp(true);
     setMeetingEnded(true);
 
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -902,8 +909,9 @@ export default function MeetingPage() {
     peerConnectionsRef.current.clear();
     remoteStreamsRef.current.clear();
 
-    socketRef.current?.disconnect();
-  }, [participants]);
+    try { socketRef.current?.disconnect(); } catch { /* already disconnected */ }
+    setTimeout(() => navigate('/dashboard'), 1500);
+  }, [participants, navigate]);
 
   return (
     <div className="h-[100dvh] w-full bg-[#050507] text-white overflow-hidden flex flex-col font-sans selection:bg-[#00FFFF]/30">
