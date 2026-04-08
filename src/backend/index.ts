@@ -3,7 +3,7 @@ import { createServer } from 'http';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import { Server } from 'socket.io';
-import cors from 'cors';
+import cors, { type CorsOptions } from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { prisma } from './lib/prisma.js';
@@ -15,11 +15,23 @@ import { registerSocketHandlers } from './socket/index.js';
 export function createBackend() {
   const app = express();
   const httpServer = createServer(app);
+  const allowedOrigins = (env.APP_ORIGINS ?? env.APP_ORIGIN)
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const isAllowedOrigin = (origin?: string) => !origin || allowedOrigins.includes(origin);
+  const corsOrigin: CorsOptions['origin'] = (origin, callback) => {
+    if (isAllowedOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error('CORS origin not allowed'));
+  };
 
   // ── Socket.io ──────────────────────────────────────────────────────────────
   const io = new Server(httpServer, {
     cors: {
-      origin: env.APP_ORIGIN,
+      origin: corsOrigin,
       methods: ['GET', 'POST'],
       credentials: true,
     },
@@ -28,6 +40,7 @@ export function createBackend() {
 
   // ── Security middleware ────────────────────────────────────────────────────
   const isProd = env.NODE_ENV === 'production';
+  app.set('trust proxy', env.TRUST_PROXY);
 
   app.use(helmet(isProd ? {
     contentSecurityPolicy: {
@@ -47,7 +60,7 @@ export function createBackend() {
 
   app.use(compression());
   app.use(cookieParser());
-  app.use(cors({ origin: env.APP_ORIGIN, credentials: true }));
+  app.use(cors({ origin: corsOrigin, credentials: true }));
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(morgan(isProd ? 'combined' : 'dev'));

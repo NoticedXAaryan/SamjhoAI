@@ -33,8 +33,14 @@ function setCookies(res: Response, accessToken: string, refreshToken: string) {
 }
 
 function clearCookies(res: Response) {
-  res.clearCookie(ACCESS_COOKIE, { path: '/' });
-  res.clearCookie(REFRESH_COOKIE, { path: '/' });
+  const options = {
+    path: '/',
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' as const : 'lax' as const,
+  };
+  res.clearCookie(ACCESS_COOKIE, options);
+  res.clearCookie(REFRESH_COOKIE, options);
 }
 
 // ── Rate limiters ────────────────────────────────────────────────────────

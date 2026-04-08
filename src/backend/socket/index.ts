@@ -35,6 +35,14 @@ function checkSocketRateLimit(ip: string): boolean {
   return true;
 }
 
+function getClientIp(socket: Socket): string {
+  const forwardedFor = socket.handshake.headers['x-forwarded-for'];
+  if (typeof forwardedFor === 'string' && forwardedFor.length > 0) {
+    return forwardedFor.split(',')[0].trim();
+  }
+  return socket.handshake.address;
+}
+
 // Periodically clean up expired rate-limit entries
 const socketCleanup = setInterval(() => {
   const now = Date.now();
@@ -53,7 +61,7 @@ export function registerSocketHandlers(io: Server): void {
   // ── Auth middleware: validate JWT on socket connect ────────────────────────
   io.use(async (socket: Socket, next) => {
     // Rate limit socket connections per IP
-    const ip = socket.handshake.address;
+    const ip = getClientIp(socket);
     if (!checkSocketRateLimit(ip)) {
       return next(new Error('Too many socket connections. Please try again in a minute.'));
     }

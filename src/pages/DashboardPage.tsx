@@ -183,6 +183,7 @@ export default function DashboardPage() {
   const [upcomingMeetings, setUpcomingMeetings] = useState<Meeting[]>([]);
   const [pastMeetings, setPastMeetings] = useState<Meeting[]>([]);
   const [meetingsLoading, setMeetingsLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
   const [calendarAnimDir, setCalendarAnimDir] = useState<'left' | 'right'>('right'); // used in navigateMonth for GSAP direction
@@ -232,13 +233,12 @@ export default function DashboardPage() {
 
   // ── load user + meetings ──────────────────────────────────────────
   useEffect(() => {
-    if (!auth.isLoggedIn()) { navigate('/auth'); return; }
-    // Fetch user from API to get fresh emailVerified + avatarId
     authApi.me().then((u) => {
       auth.setUser(u);
       setUser(u);
-    }).catch(() => setUser(auth.getUser()));
-    meetingsApi.list().then((data) => {
+      setAuthChecked(true);
+      return meetingsApi.list().catch(() => [] as Meeting[]);
+    }).then((data) => {
       const upcoming = data.filter(m => {
         const s = new Date(m.scheduledStartAt);
         return s.getTime() >= Date.now() && m.status !== 'COMPLETED';
@@ -249,8 +249,15 @@ export default function DashboardPage() {
       }).sort((a, b) => new Date(b.scheduledStartAt).getTime() - new Date(a.scheduledStartAt).getTime());
       setUpcomingMeetings(upcoming);
       setPastMeetings(past);
-    }).catch(() => { }).finally(() => setMeetingsLoading(false));
+    }).catch(() => {
+      auth.clear();
+      navigate('/auth');
+    }).finally(() => {
+      setMeetingsLoading(false);
+    });
   }, [navigate]);
+
+  if (!authChecked) return null;
 
   // ── view transition ───────────────────────────────────────────────
   const switchView = useCallback((view: 'meetings' | 'calendar' | 'settings') => {

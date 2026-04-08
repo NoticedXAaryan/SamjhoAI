@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
-import { auth, meetingsApi } from '../lib/api';
+import { auth, authApi, meetingsApi } from '../lib/api';
 import { AvatarIcon } from '../components/AvatarIcons';
 import { useMeetingMedia } from '../lib/useMeetingMedia';
 import { useMediaDevices } from '../lib/useMediaDevices';
@@ -85,15 +85,22 @@ export default function MeetingPage() {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const meetingId = searchParams.get('id') || 'default-room';
+  const [authChecked, setAuthChecked] = useState(false);
 
   // Route guard — redirect if not authenticated
   useEffect(() => {
-    if (!auth.isLoggedIn()) {
-      navigate('/auth', { state: { from: location } });
-    }
+    authApi.me()
+      .then((u) => {
+        auth.setUser(u);
+        setAuthChecked(true);
+      })
+      .catch(() => {
+        auth.clear();
+        navigate('/auth', { state: { from: location } });
+      });
   }, [navigate, location]);
 
-  if (!auth.isLoggedIn()) return null;
+  if (!authChecked) return null;
 
   // Pre-join state
   const [hasJoined, setHasJoined] = useState(false);
