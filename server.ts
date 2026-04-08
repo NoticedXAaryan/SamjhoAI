@@ -1,6 +1,7 @@
 import { createBackend } from './src/backend/index.js';
 import { env } from './src/backend/config/env.js';
 import { prisma } from './src/backend/lib/prisma.js';
+import { stopSocketCleanup } from './src/backend/socket/index.js';
 
 async function connectDB() {
   await prisma.$queryRaw`SELECT 1`;
@@ -58,6 +59,8 @@ async function startServer() {
   async function shutdownSignal() {
     console.log('[Samjho] Shutting down gracefully...');
     httpServer.close(async () => {
+      // Clean up socket rate-limit interval
+      stopSocketCleanup();
       // Close all Socket.IO connections
       io.close(() => console.log('[Samjho] Socket.IO closed'));
       // Disconnect Prisma

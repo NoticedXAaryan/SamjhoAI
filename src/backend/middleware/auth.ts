@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyAccess, TokenPayload } from '../lib/jwt.js';
+import { verifyAccess, TokenPayload, ACCESS_COOKIE } from '../lib/jwt.js';
 
 declare global {
   namespace Express {
@@ -10,13 +10,20 @@ declare global {
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+  // Try Authorization header first, then httpOnly cookie
+  let token: string | undefined;
   const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) {
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7);
+  } else {
+    token = (req.cookies as Record<string, string>)?.[ACCESS_COOKIE];
+  }
+
+  if (!token) {
     res.status(401).json({ error: 'Missing or invalid authorization header' });
     return;
   }
 
-  const token = authHeader.slice(7);
   try {
     req.user = verifyAccess(token);
     next();

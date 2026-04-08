@@ -1,29 +1,23 @@
 // Base URL: in production points to Render backend; in dev proxied by Vite
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
-// ── Token storage ─────────────────────────────────────────────────────────────
-let refreshPromise: Promise<string> | null = null;
+// ── Token/user storage (cookies handle auth, localStorage only for UI state) ──
+let refreshPromise: Promise<void> | null = null;
 
 export const auth = {
-  getAccessToken: () => localStorage.getItem('accessToken'),
-  getRefreshToken: () => localStorage.getItem('refreshToken'),
-  setTokens: (access: string, refresh: string) => {
-    localStorage.setItem('accessToken', access);
-    localStorage.setItem('refreshToken', refresh);
-    refreshPromise = null; // Reset so next expiry triggers a new refresh
-  },
   setUser: (user: User) => localStorage.setItem('user', JSON.stringify(user)),
   getUser: (): User | null => {
     const raw = localStorage.getItem('user');
     return raw ? JSON.parse(raw) : null;
   },
   clear: () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     refreshPromise = null;
   },
-  isLoggedIn: () => !!localStorage.getItem('accessToken'),
+  isLoggedIn: () => {
+    // Best-effort: check localStorage. Server-side cookies are authoritative.
+    return !!localStorage.getItem('user');
+  },
 };
 
 // ── Fetch wrapper ─────────────────────────────────────────────────────────────
@@ -33,44 +27,37 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     ...(options.headers as Record<string, string>),
   };
 
-  const token = auth.getAccessToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers,
+    credentials: 'include', // Send cookies, accept Set-Cookie
+  });
 
   if (res.status === 401) {
-    const refreshToken = auth.getRefreshToken();
-    if (refreshToken) {
-      // Refresh only once — concurrent 401s all wait on the same promise
-      try {
-        if (!refreshPromise) {
-          refreshPromise = (async () => {
-            const refreshRes = await fetch(`${BASE}/api/auth/refresh`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ refreshToken }),
-            });
-            if (!refreshRes.ok) throw new Error('Refresh failed');
-            const { accessToken } = await refreshRes.json();
-            auth.setTokens(accessToken, refreshToken);
-            return accessToken;
-          })();
-        }
-        await refreshPromise;
-      } catch {
-        auth.clear();
-        window.location.href = '/auth';
-        throw new Error('Session expired');
+    // Try to refresh — only once at a time
+    try {
+      if (!refreshPromise) {
+        refreshPromise = fetch(`${BASE}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        }).then(async (refreshRes) => {
+          if (!refreshRes.ok) throw new Error('Refresh failed');
+        });
       }
-      // Retry with fresh token
-      headers['Authorization'] = `Bearer ${auth.getAccessToken()}`;
-      const retry = await fetch(`${BASE}${path}`, { ...options, headers });
-      if (!retry.ok) throw new Error(await retry.text());
-      return retry.json();
+      await refreshPromise;
+    } catch {
+      auth.clear();
+      window.location.href = '/auth';
+      throw new Error('Session expired');
+    } finally {
+      refreshPromise = null;
     }
-    auth.clear();
-    window.location.href = '/auth';
-    throw new Error('Session expired');
+
+    // Retry with fresh access token (cookie will be updated by /refresh)
+    const retry = await fetch(`${BASE}${path}`, { ...options, headers, credentials: 'include' });
+    if (!retry.ok) throw new Error(await retry.text());
+    return retry.json();
   }
 
   if (!res.ok) {
@@ -78,7 +65,8 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     throw new Error(body.error ?? res.statusText);
   }
 
-  return res.json();
+  const text = await res.text();
+  return text ? JSON.parse(text) : ({} as T);
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -103,13 +91,13 @@ export interface Meeting {
 // ── Auth API ──────────────────────────────────────────────────────────────────
 export const authApi = {
   register: (data: { firstName: string; lastName: string; email: string; password: string }) =>
-    apiFetch<{ accessToken: string; refreshToken: string; user: User }>('/api/auth/register', {
+    apiFetch<{ user: User }>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   login: (data: { email: string; password: string }) =>
-    apiFetch<{ accessToken: string; refreshToken: string; user: User }>('/api/auth/login', {
+    apiFetch<{ user: User }>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -117,7 +105,7 @@ export const authApi = {
   me: () => apiFetch<User>('/api/auth/me'),
 
   logout: async () => {
-    await fetch(`${BASE}/api/auth/logout`, { method: 'POST' }).catch(() => {});
+    await fetch(`${BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
     auth.clear();
   },
 

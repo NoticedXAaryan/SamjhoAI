@@ -1,5 +1,7 @@
 import express from 'express';
 import { createServer } from 'http';
+import cookieParser from 'cookie-parser';
+import compression from 'compression';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -31,9 +33,9 @@ export function createBackend() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"], // Vite needs inline scripts in dev
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:', 'blob:', 'https://storage.googleapis.com', 'https://cdn.jsdelivr.net'],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"], // Tailwind v4 runtime requires this
+        imgSrc: ["'self'", 'data:', 'blob:', 'https://storage.googleapis.com', 'https://cdn.jsdelivr.net', 'https://images.unsplash.com'],
         connectSrc: ["'self'", 'ws:', 'wss:', 'https://storage.googleapis.com', 'https://cdn.jsdelivr.net'],
         mediaSrc: ["'self'", 'blob:', 'mediastream:'],
         workerSrc: ["'self'", 'blob:'],
@@ -43,19 +45,26 @@ export function createBackend() {
     },
   } : { contentSecurityPolicy: false }));
 
+  app.use(compression());
+  app.use(cookieParser());
   app.use(cors({ origin: env.APP_ORIGIN, credentials: true }));
-  app.use(express.json({ limit: '10mb' }));   // prevent giant payloads
+  app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(morgan(isProd ? 'combined' : 'dev'));
 
-  // ── Health check (Railway/UptimeRobot) ─────────────────────────────────────
-  app.get('/health', async (_req, res) => {
+  // ── Health checks ────────────────────────────────────────────────────────
+  // Liveness probe: always returns 200 so the process stays alive
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // Readiness probe: checks DB connectivity — returns 503 if down
+  app.get('/health/ready', async (_req, res) => {
     try {
       await prisma.$queryRaw`SELECT 1`;
       res.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
     } catch {
-      // Return 200 even if DB is down so healthcheck passes and server isn't killed
-      res.status(200).json({ status: 'ok', db: 'disconnected', timestamp: new Date().toISOString() });
+      res.status(503).json({ status: 'error', db: 'disconnected', timestamp: new Date().toISOString() });
     }
   });
 

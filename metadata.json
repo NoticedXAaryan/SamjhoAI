@@ -1,5 +1,0 @@
-{
-  "name": "Samjho — Accessible Video Conferencing",
-  "description": "A real-time accessible video conferencing platform with sign language recognition, live translation, and meeting transcription.",
-  "requestFramePermissions": ["camera", "microphone"]
-}

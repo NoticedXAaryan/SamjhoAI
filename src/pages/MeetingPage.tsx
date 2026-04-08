@@ -11,6 +11,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { auth, meetingsApi } from '../lib/api';
+import { AvatarIcon } from '../components/AvatarIcons';
 import { useMeetingMedia } from '../lib/useMeetingMedia';
 import { useMediaDevices } from '../lib/useMediaDevices';
 import { toast } from 'sonner';
@@ -85,11 +86,14 @@ export default function MeetingPage() {
   const searchParams = new URLSearchParams(location.search);
   const meetingId = searchParams.get('id') || 'default-room';
 
-  // Route guard — skip render if not authenticated
-  if (!auth.isLoggedIn()) {
-    navigate('/auth', { state: { from: location } });
-    return null;
-  }
+  // Route guard — redirect if not authenticated
+  useEffect(() => {
+    if (!auth.isLoggedIn()) {
+      navigate('/auth', { state: { from: location } });
+    }
+  }, [navigate, location]);
+
+  if (!auth.isLoggedIn()) return null;
 
   // Pre-join state
   const [hasJoined, setHasJoined] = useState(false);
@@ -373,11 +377,10 @@ export default function MeetingPage() {
   useEffect(() => {
     if (!hasJoined) return;
 
-    const token = auth.getAccessToken();
     const apiBase = import.meta.env.VITE_API_URL ?? '';
     const socketUrl = apiBase || window.location.origin;
     const socket = io(socketUrl, {
-      auth: { accessToken: token },
+      withCredentials: true,  // Send cookies with WebSocket connection
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 2000,
@@ -630,12 +633,12 @@ export default function MeetingPage() {
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setIsMuted(!audioTrack.enabled);
-        toast.success(audioTrack.enabled ? 'Microphone unmuted' : 'Microphone muted', { duration: 1500 });
+        toast.success(!audioTrack.enabled ? 'Microphone muted' : 'Microphone unmuted', { duration: 1500 });
         return;
       }
     }
     setIsMuted((prev) => {
-      toast.success(!prev ? 'Microphone unmuted' : 'Microphone muted', { duration: 1500 });
+      toast.success(prev ? 'Microphone unmuted' : 'Microphone muted', { duration: 1500 });
       return !prev;
     });
   }, []);
@@ -1154,12 +1157,16 @@ export default function MeetingPage() {
                     {/* Local User */}
                     <div className="flex items-center justify-between group">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium overflow-hidden">
-                          You
+                        <div className="w-8 h-8 rounded-full overflow-hidden shrink-0">
+                          <AvatarIcon
+                            avatarId={auth.getUser()?.avatarId ?? 0}
+                            name={userName}
+                            size={32}
+                          />
                         </div>
                         <div>
-                          <div className="text-sm font-medium">You</div>
-                          <div className="text-xs text-white/40">Guest</div>
+                          <div className="text-sm font-medium">{userName} (You)</div>
+                          <div className="text-xs text-white/40">Host</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 text-white/40">
@@ -1171,8 +1178,8 @@ export default function MeetingPage() {
                     {displayParticipants.map(p => (
                       <div key={p.id} className="flex items-center justify-between group">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium overflow-hidden">
-                            {p.avatarUrl ? <img src={p.avatarUrl} className="w-full h-full object-cover" alt={p.name} /> : p.initials}
+                          <div className="w-8 h-8 rounded-full overflow-hidden shrink-0">
+                            <AvatarIcon name={p.name} size={32} avatarId={0} />
                           </div>
                           <div>
                             <div className="text-sm font-medium">{p.name}</div>

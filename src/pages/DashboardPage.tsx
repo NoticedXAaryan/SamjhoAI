@@ -453,8 +453,8 @@ export default function DashboardPage() {
         {/* User avatar */}
         {user && (
           <div className="px-6 pb-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-xs font-bold text-white shrink-0">
-              {initials}
+            <div className="w-9 h-9 rounded-full overflow-hidden shrink-0">
+              <AvatarIcon avatarId={user.avatarId} name={user.name} size={36} />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-white truncate">{user.name}</p>
@@ -992,11 +992,13 @@ function DeviceSettingsPanel() {
   const requestPermission = useCallback(async () => {
     setPermissionLoading(true);
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: false, video: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      stream.getTracks().forEach((t) => t.stop()); // release immediately — we only need the permission
     } catch {
-      // Permission may be denied — try audio only
+      // Camera denied or unavailable — try audio only
       try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((t) => t.stop());
       } catch {
         // Completely denied, still show empty list
       }

@@ -42,6 +42,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [pw, setPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
   const resetToken = search.get('resetToken');
 
   const strength = useMemo(() => passwordStrength(pw), [pw]);
@@ -63,7 +64,6 @@ export default function AuthPage() {
     try {
       if (view === 'login') {
         const res = await authApi.login({ email, password });
-        auth.setTokens(res.accessToken, res.refreshToken);
         auth.setUser({ ...res.user, emailVerified: res.user.emailVerified });
       } else {
         const firstName = formData.get('firstName') as string;
@@ -73,8 +73,12 @@ export default function AuthPage() {
           setLoading(false);
           return;
         }
+        if (confirmPw !== password) {
+          setError('Passwords do not match.');
+          setLoading(false);
+          return;
+        }
         const res = await authApi.register({ firstName, lastName, email, password });
-        auth.setTokens(res.accessToken, res.refreshToken);
         auth.setUser({ ...res.user, emailVerified: res.user.emailVerified });
         // Already logged in — go straight to dashboard
         navigate('/dashboard');
@@ -290,6 +294,24 @@ export default function AuthPage() {
 
               {view === 'register' && (
                 <PasswordRuleList pw={pw} />
+              )}
+
+              {view === 'register' && (
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Confirm password"
+                    value={confirmPw}
+                    onChange={(e) => setConfirmPw(e.target.value)}
+                    required
+                    className={inputClass(!!(confirmPw && confirmPw !== pw)) + ' pr-12'}
+                  />
+                  {confirmPw && confirmPw === pw && (
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    </div>
+                  )}
+                </div>
               )}
 
               {view === 'login' && !error && (

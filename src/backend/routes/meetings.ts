@@ -71,10 +71,16 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
   res.json(meetings);
 });
 
-// GET /api/meetings/:id — get a single meeting
+// GET /api/meetings/:id — get a single meeting (participant check)
 router.get('/:id', requireAuth, async (req: Request, res: Response) => {
-  const meeting = await prisma.meeting.findUnique({
-    where: { id: req.params.id },
+  const meeting = await prisma.meeting.findFirst({
+    where: {
+      id: req.params.id,
+      OR: [
+        { hostId: req.user!.userId },
+        { participants: { some: { userId: req.user!.userId } } },
+      ],
+    },
     include: {
       host: { select: { id: true, name: true } },
       _count: { select: { participants: true } },
@@ -82,7 +88,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
   });
 
   if (!meeting) {
-    res.status(404).json({ error: 'Meeting not found' });
+    res.status(404).json({ error: 'Meeting not found or you do not have access' });
     return;
   }
 
@@ -113,6 +119,15 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response) => {
 
 // GET /api/meetings/:id/participants — list meeting participants
 router.get('/:id/participants', requireAuth, async (req: Request, res: Response) => {
+  // Verify user has access to this meeting
+  const hasAccess = await prisma.participant.findFirst({
+    where: { meetingId: req.params.id, userId: req.user!.userId },
+  });
+  if (!hasAccess) {
+    res.status(403).json({ error: 'You do not have access to this meeting' });
+    return;
+  }
+
   const participants = await prisma.participant.findMany({
     where: { meetingId: req.params.id },
     include: { user: { select: { id: true, name: true } } },
@@ -124,6 +139,15 @@ router.get('/:id/participants', requireAuth, async (req: Request, res: Response)
 
 // GET /api/meetings/:id/messages — load chat message history
 router.get('/:id/messages', requireAuth, async (req: Request, res: Response) => {
+  // Verify user has access to this meeting
+  const hasAccess = await prisma.participant.findFirst({
+    where: { meetingId: req.params.id, userId: req.user!.userId },
+  });
+  if (!hasAccess) {
+    res.status(403).json({ error: 'You do not have access to this meeting' });
+    return;
+  }
+
   const messages = await prisma.message.findMany({
     where: { meetingId: req.params.id },
     orderBy: { createdAt: 'asc' },

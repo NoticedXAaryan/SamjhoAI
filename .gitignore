@@ -40,17 +40,17 @@ tmp/
 # Neon CLI config
 .neon/
 
-# MCP config (can be committed for project setup)
-!.mcp.json
-
 # IDE / AI tools
 .claude/
 .antigravity/
+.gemini/
 
-AUDIT.md
-
-# wrangler files
+# wrangler files (removed but ignore just in case)
 .wrangler
 .dev.vars*
 !.dev.vars.example
 !.env.example
+
+# Markdown files (except README)
+*.md
+!README.md

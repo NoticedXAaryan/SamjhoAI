@@ -15,13 +15,7 @@ const accentSecondary = '#3b82f6';
 const textColor = '#e2e2e2';
 const mutedTextColor = '#6b6b7b';
 
-function css(name: string) {
-  const m: Record<string, string> = {
-    fontFamily, fontSize: '', fontWeight: '', color: '', lineHeight: '',
-    letterSpacing: '', textTransform: '', wordBreak: '', textAlign: '',
-  };
-  return name;
-}
+
 
 function baseLayout(title: string, bodyHtml: string, footerExtra?: string): string {
   return `<!DOCTYPE html>
@@ -155,7 +149,7 @@ function pFallback(href: string, label?: string): string {
 
 /** Verification email — sent after registration */
 export function verificationEmailTemplate(name: string, token: string, origin: string): string {
-  const link = `${origin}/auth?verified=true&token=${token}`;
+  const link = `${origin}/api/auth/verify-email?token=${token}`;
   const body =
     heading(`Welcome, ${name}!`) +
     pMain("You're one step away from accessing Samjho AI — the accessibility platform designed to break communication barriers.") +
