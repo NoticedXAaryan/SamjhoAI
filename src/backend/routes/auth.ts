@@ -108,7 +108,36 @@ router.post('/register', async (req: Request, res: Response) => {
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      res.status(409).json({ error: 'An account with this email already exists' });
+      // Idempotent behavior for cold-start/network timeout scenarios:
+      // if account already exists with the same password, treat this as login.
+      const samePassword = await bcrypt.compare(password, existing.passwordHash);
+      if (!samePassword) {
+        res.status(409).json({ error: 'An account with this email already exists. Please log in.' });
+        return;
+      }
+
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null },
+      });
+
+      const rawToken = generateRefreshToken();
+      const tokenHash = hashToken(rawToken);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await prisma.refreshToken.create({
+        data: { tokenHash, userId: existing.id, expiresAt },
+      });
+
+      const payload = { userId: existing.id, email: existing.email };
+      setCookies(res, signAccess(payload), rawToken);
+      res.status(200).json({
+        user: {
+          id: existing.id,
+          name: existing.name,
+          email: existing.email,
+          emailVerified: existing.emailVerified,
+        },
+      });
       return;
     }
 

@@ -1,6 +1,6 @@
 // Force same-origin in production to avoid broken absolute URLs from misconfigured env.
 const BASE = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL ?? '');
-const REQUEST_TIMEOUT_MS = 12_000;
+const REQUEST_TIMEOUT_MS = 25_000;
 const NETWORK_RETRIES = 2;
 const RETRY_DELAY_MS = 400;
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
