@@ -3,9 +3,11 @@ import { env } from '../config/env.js';
 import { verificationEmailTemplate, passwordResetEmailTemplate, devVerificationLink } from './email-templates.js';
 
 let transporter: nodemailer.Transporter | null = null;
+let transporterVerified = false;
 
 function hasTransportConfigured(): boolean {
-  return !!(env.EMAIL_RESEND_API_KEY || env.SMTP_HOST);
+  if (env.EMAIL_RESEND_API_KEY) return true;
+  return !!(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
 }
 
 function getTransporter(): nodemailer.Transporter {
@@ -18,13 +20,18 @@ function getTransporter(): nodemailer.Transporter {
         auth: { user: 'resend', pass: env.EMAIL_RESEND_API_KEY },
       });
     } else if (env.SMTP_HOST) {
+      const isGmailHost = env.SMTP_HOST.toLowerCase().includes('gmail');
       transporter = nodemailer.createTransport({
+        ...(isGmailHost ? { service: 'gmail' } : {}),
         host: env.SMTP_HOST,
         port: env.SMTP_PORT || 587,
         secure: (env.SMTP_PORT || 587) === 465,
         auth: env.SMTP_USER && env.SMTP_PASS
           ? { user: env.SMTP_USER, pass: env.SMTP_PASS }
           : undefined,
+        tls: {
+          servername: env.SMTP_HOST,
+        },
       });
     }
   }
@@ -32,7 +39,7 @@ function getTransporter(): nodemailer.Transporter {
 }
 
 // Verified senders — use onboarding@resend.dev by default until a domain is verified on Resend dashboard
-const SENDER = env.EMAIL_FROM || 'onboarding@resend.dev';
+const SENDER = env.EMAIL_FROM || env.SMTP_USER || 'onboarding@resend.dev';
 const REPLY_TO = env.EMAIL_FROM ? null : 'noreply@samjho.ai';
 
 export function logEmailLinkDev(type: 'verify' | 'reset', email: string, link: string, label: string): void {
@@ -46,6 +53,11 @@ async function sendMail(to: string, subject: string, html: string): Promise<bool
   }
   const transport = getTransporter();
   try {
+    if (!transporterVerified) {
+      await transport.verify();
+      transporterVerified = true;
+    }
+
     const info = await transport.sendMail({
       from: SENDER,
       ...(REPLY_TO ? { replyTo: REPLY_TO } : {}),
@@ -53,7 +65,7 @@ async function sendMail(to: string, subject: string, html: string): Promise<bool
       subject,
       html,
     });
-    console.log(`[Email] Sent "${subject}" to ${to} (resend.com/${info.messageId})`);
+    console.log(`[Email] Sent "${subject}" to ${to} (${info.messageId})`);
     return true;
   } catch (err: unknown) {
     console.error('[Email] Failed:', err instanceof Error ? err.message : String(err));
