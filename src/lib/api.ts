@@ -1,5 +1,5 @@
-// Base URL: in production this should usually be empty (same-origin).
-const BASE = import.meta.env.VITE_API_URL ?? '';
+// Force same-origin in production to avoid broken absolute URLs from misconfigured env.
+const BASE = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL ?? '');
 const REQUEST_TIMEOUT_MS = 12_000;
 const NETWORK_RETRIES = 2;
 const RETRY_DELAY_MS = 400;
