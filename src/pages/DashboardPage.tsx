@@ -447,12 +447,12 @@ export default function DashboardPage() {
 
   /* ── render ───────────────────────────────────────────────────── */
   return (
-    <div className="h-[100dvh] w-full bg-gradient-to-br from-slate-900 via-[#050507] to-slate-900 text-white font-sans flex flex-col overflow-hidden selection:bg-white/30">
+    <div className="relative h-[100dvh] w-full bg-gradient-to-br from-slate-900 via-[#050507] to-slate-900 text-white font-sans flex flex-col md:flex-row overflow-hidden selection:bg-white/30">
       {/* Background glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-blue-500/10 blur-[120px] rounded-full pointer-events-none" />
 
       {/* Sidebar */}
-      <aside ref={sidebarRef} className="w-64 m-4 rounded-[2rem] bg-white/[0.02] backdrop-blur-3xl border border-white/10 flex flex-col shadow-2xl shrink-0">
+      <aside ref={sidebarRef} className="w-[calc(100%-2rem)] md:w-64 m-4 md:mr-0 rounded-[2rem] bg-white/[0.02] backdrop-blur-3xl border border-white/10 flex flex-col shadow-2xl shrink-0">
         <div className="p-6 flex items-center gap-3">
           <Sparkles className="w-6 h-6 text-[#00FFFF]" />
           <span className="font-semibold text-lg tracking-tight">Samjho AI</span>
@@ -508,7 +508,7 @@ export default function DashboardPage() {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 flex flex-col my-4 mr-4 overflow-hidden relative">
+      <main className="flex-1 min-h-0 flex flex-col mx-4 mb-4 mt-0 md:my-4 md:mx-4 overflow-hidden relative">
         {/* Header */}
         <header ref={headerRef} className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-6 shrink-0 pt-4 px-2">
           <div>

@@ -699,6 +699,14 @@ export default function MeetingPage() {
     };
   }, []);
 
+  if (!authChecked) {
+    return (
+      <div className="h-[100dvh] w-full bg-[#050507] text-white flex items-center justify-center font-sans selection:bg-[#00FFFF]/30">
+        <div className="text-sm text-white/60">Preparing your meeting...</div>
+      </div>
+    );
+  }
+
   if (meetingEnded) {
     return (
       <div className="h-[100dvh] w-full bg-[#050507] text-white flex flex-col items-center justify-center font-sans selection:bg-[#00FFFF]/30 p-4 sm:p-6">
