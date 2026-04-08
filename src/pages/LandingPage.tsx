@@ -449,6 +449,32 @@ export default function LandingPage() {
   const textOpacity = useTransform(heroProgress, [0, 0.15], [1, 0]);
   const textY = useTransform(heroProgress, [0, 0.15], [0, -50]);
 
+  useEffect(() => {
+    const apiBase = import.meta.env.VITE_API_URL ?? '';
+    const controller = new AbortController();
+
+    const warmup = async () => {
+      try {
+        await fetch(`${apiBase}/health/ready`, {
+          method: 'GET',
+          cache: 'no-store',
+          credentials: 'include',
+          signal: controller.signal,
+        });
+      } catch {
+        // Non-blocking warm-up call. Ignore failures silently.
+      }
+    };
+
+    void warmup();
+    const retryTimer = setTimeout(() => void warmup(), 2500);
+
+    return () => {
+      clearTimeout(retryTimer);
+      controller.abort();
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-black text-[#f5f5f7] font-sans selection:bg-[#00FFFF]/30">
       <DynamicIslandNav />
