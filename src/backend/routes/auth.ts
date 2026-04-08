@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
+import { Prisma } from '@prisma/client';
 import { env } from '../config/env.js';
 import { prisma } from '../lib/prisma.js';
 import { generateRefreshToken, hashToken, signAccess } from '../lib/jwt.js';
@@ -14,6 +15,16 @@ const router = Router();
 
 // ── Cookie helpers ─────────────────────────────────────────────────────────
 const isProd = env.NODE_ENV === 'production';
+
+function isTransientDbError(err: unknown): boolean {
+  if (err instanceof Prisma.PrismaClientInitializationError) return true;
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("Can't reach database server") ||
+    msg.includes('terminating connection due to administrator command') ||
+    msg.includes('Timed out fetching a new connection')
+  );
+}
 
 function setCookies(res: Response, accessToken: string, refreshToken: string) {
   res.cookie(ACCESS_COOKIE, accessToken, {
@@ -169,6 +180,45 @@ router.post('/register', async (req: Request, res: Response) => {
     res.status(201).json({ user: { id: user.id, name: user.name, email: user.email, emailVerified: false } });
   } catch (err) {
     console.error('[Auth] Register error:', err);
+
+    // Recovery path: registration may have created user but failed before response (cold start/DB hiccup).
+    try {
+      const fallbackEmailRaw = req.body?.email;
+      const fallbackPasswordRaw = req.body?.password;
+      if (typeof fallbackEmailRaw === 'string' && typeof fallbackPasswordRaw === 'string') {
+        const email = normalizeEmail(fallbackEmailRaw);
+        const existing = await prisma.user.findUnique({ where: { email } });
+        if (existing) {
+          const valid = await bcrypt.compare(fallbackPasswordRaw, existing.passwordHash);
+          if (valid) {
+            const rawToken = generateRefreshToken();
+            const tokenHash = hashToken(rawToken);
+            const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+            await prisma.refreshToken.create({
+              data: { tokenHash, userId: existing.id, expiresAt },
+            });
+            const payload = { userId: existing.id, email: existing.email };
+            setCookies(res, signAccess(payload), rawToken);
+            res.status(200).json({
+              user: {
+                id: existing.id,
+                name: existing.name,
+                email: existing.email,
+                emailVerified: existing.emailVerified,
+              },
+            });
+            return;
+          }
+        }
+      }
+    } catch (recoveryErr) {
+      console.error('[Auth] Register recovery failed:', recoveryErr);
+    }
+
+    if (isTransientDbError(err)) {
+      res.status(503).json({ error: 'Service is waking up. Please retry in a few seconds.' });
+      return;
+    }
     res.status(500).json({ error: 'Registration failed. Please try again.' });
   }
 });
@@ -228,6 +278,10 @@ router.post('/login', async (req: Request, res: Response) => {
     res.json({ user: { id: user.id, name: user.name, email: user.email, emailVerified: user.emailVerified } });
   } catch (err) {
     console.error('[Auth] Login error:', err);
+    if (isTransientDbError(err)) {
+      res.status(503).json({ error: 'Service is waking up. Please retry in a few seconds.' });
+      return;
+    }
     res.status(500).json({ error: 'Login failed. Please try again.' });
   }
 });
