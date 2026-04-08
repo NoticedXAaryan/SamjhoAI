@@ -86,7 +86,20 @@ export default function AuthPage() {
       }
       navigate('/dashboard');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+
+      if (view === 'register' && (message.includes('Unable to reach server') || message.includes('timed out'))) {
+        try {
+          const fallback = await authApi.login({ email, password });
+          auth.setUser({ ...fallback.user, emailVerified: fallback.user.emailVerified });
+          navigate('/dashboard');
+          return;
+        } catch {
+          // Keep original registration error if fallback login fails.
+        }
+      }
+
+      setError(message);
     } finally {
       setLoading(false);
     }
