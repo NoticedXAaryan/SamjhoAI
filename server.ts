@@ -7,6 +7,19 @@ async function connectDB() {
   await prisma.$queryRaw`SELECT 1`;
 }
 
+function startDbHeartbeat(intervalMs = 120_000) {
+  const timer = setInterval(async () => {
+    try {
+      await connectDB();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn('[Samjho] Database heartbeat failed:', msg);
+    }
+  }, intervalMs);
+  timer.unref();
+  return timer;
+}
+
 async function startServer() {
   const { app, httpServer, io } = createBackend();
 
@@ -55,6 +68,8 @@ async function startServer() {
       }
     });
 
+  const dbHeartbeat = startDbHeartbeat();
+
   // ── Graceful shutdown ───────────────────────────────────────────────
   async function shutdownSignal() {
     console.log('[Samjho] Shutting down gracefully...');
@@ -65,6 +80,7 @@ async function startServer() {
       io.close(() => console.log('[Samjho] Socket.IO closed'));
       // Disconnect Prisma
       await prisma.$disconnect();
+      clearInterval(dbHeartbeat);
       console.log('[Samjho] Disconnected from database');
       process.exit(0);
     });
