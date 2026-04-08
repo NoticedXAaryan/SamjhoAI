@@ -1,36 +1,31 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { fileURLToPath } from 'url';
+import { defineConfig } from 'vite';
 
-import { cloudflare } from "@cloudflare/vite-plugin";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
-  return {
-    plugins: [react(), tailwindcss(), cloudflare()],
-    define: {
-      'process.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || ''),
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, '.'),
     },
-    resolve: {
-      alias: {
-        '@': path.resolve(__dirname, '.'),
+  },
+  server: {
+    port: 5173,
+    strictPort: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/socket.io': {
+        target: 'http://localhost:3000',
+        ws: true,
+        changeOrigin: true,
       },
     },
-    server: {
-      port: 5173,
-      strictPort: true,
-      proxy: {
-        '/api': {
-          target: 'http://localhost:3000',
-          changeOrigin: true,
-        },
-        '/socket.io': {
-          target: 'http://localhost:3000',
-          ws: true,
-          changeOrigin: true,
-        },
-      },
-    },
-  };
+  },
 });

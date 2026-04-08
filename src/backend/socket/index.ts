@@ -15,6 +15,8 @@ interface UserData {
 }
 
 const MAX_MEETING_SIZE = 8;
+const MAX_CHAT_MESSAGE_LENGTH = 5000;
+const SOCKET_CLEANUP_INTERVAL = 5 * 60_000; // 5 min cleanup for expired rate-limit entries
 
 // Socket connection rate limiting (per IP)
 const socketConnectionMap = new Map<string, { count: number; windowStart: number }>();
@@ -33,6 +35,20 @@ function checkSocketRateLimit(ip: string): boolean {
   return true;
 }
 
+// Periodically clean up expired rate-limit entries
+const socketCleanup = setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of socketConnectionMap) {
+    if (now - entry.windowStart > SOCKET_CONN_WINDOW) socketConnectionMap.delete(ip);
+  }
+}, SOCKET_CLEANUP_INTERVAL);
+socketCleanup.unref(); // Don't prevent process exit
+
+/** Call this on server shutdown to stop the cleanup timer. */
+export function stopSocketCleanup(): void {
+  clearInterval(socketCleanup);
+}
+
 export function registerSocketHandlers(io: Server): void {
   // ── Auth middleware: validate JWT on socket connect ────────────────────────
   io.use(async (socket: Socket, next) => {
@@ -42,8 +58,28 @@ export function registerSocketHandlers(io: Server): void {
       return next(new Error('Too many socket connections. Please try again in a minute.'));
     }
 
-    const token = socket.handshake.auth.accessToken ?? socket.handshake.query.token;
-    if (!token || typeof token !== 'string') {
+    // Read access token from httpOnly cookie or auth payload
+    let token: string | undefined;
+
+    // Try accessToken from auth (legacy / fallback)
+    if (socket.handshake.auth.accessToken && typeof socket.handshake.auth.accessToken === 'string') {
+      token = socket.handshake.auth.accessToken;
+    } else if (socket.handshake.query.token && typeof socket.handshake.query.token === 'string') {
+      token = socket.handshake.query.token;
+    }
+
+    // Parse httpOnly cookie from handshake
+    if (!token) {
+      const rawCookie = socket.handshake.headers.cookie;
+      if (typeof rawCookie === 'string') {
+        const match = rawCookie.match(/accessToken=([^;]+)/);
+        if (match) {
+          token = decodeURIComponent(match[1]);
+        }
+      }
+    }
+
+    if (!token) {
       return next(new Error('Authentication required'));
     }
 
@@ -152,17 +188,27 @@ export function registerSocketHandlers(io: Server): void {
     });
 
     // ── Chat message ─────────────────────────────────────────────────────────
-    socket.on('chat-message', async (meetingId: string, message: { text: string; senderName: string }) => {
+    socket.on('chat-message', async (meetingId: string, message: { text: string }) => {
       const dbUser = socket.data.userPayload;
-      const senderName = message.senderName || socket.data.user?.name || 'Guest';
+      if (!dbUser || !socket.data.user) return;
+
+      // Enforce message length limit
+      const text = message.text?.trim();
+      if (!text || text.length === 0) return;
+      if (text.length > MAX_CHAT_MESSAGE_LENGTH) {
+        socket.emit('chat-error', { error: `Message must be under ${MAX_CHAT_MESSAGE_LENGTH} characters` });
+        return;
+      }
+
+      const senderName = socket.data.user.name; // Always use authenticated name
 
       try {
         await prisma.message.create({
           data: {
             meetingId,
-            senderId: dbUser?.id || socket.id,
+            senderId: dbUser.id,
             senderName,
-            text: message.text,
+            text,
           },
         });
       } catch {
@@ -171,9 +217,9 @@ export function registerSocketHandlers(io: Server): void {
 
       const payload = {
         id: `${Date.now()}-${socket.id}`,
-        senderId: dbUser?.id || socket.id,
+        senderId: dbUser.id,
         senderName,
-        text: message.text,
+        text,
         timestamp: new Date().toISOString(),
       };
 

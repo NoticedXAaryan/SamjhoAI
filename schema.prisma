@@ -25,6 +25,7 @@ model User {
 
   hostedMeetings        Meeting[]     @relation("MeetingHost")
   participations        Participant[]
+  refreshTokens         RefreshToken[]
 
   @@map("users")
 }
@@ -70,6 +71,22 @@ enum MeetingStatus {
   ACTIVE
   COMPLETED
   CANCELLED
+}
+
+// ── Refresh token storage (rotation + revocation) ──
+model RefreshToken {
+  id           String   @id @default(uuid())
+  tokenHash    String   @unique  // SHA-256 hash of the actual token
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedBy   String?  // ID of the token that replaced this one (rotation chain)
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("refresh_tokens")
 }
 
 enum ParticipantRole {
