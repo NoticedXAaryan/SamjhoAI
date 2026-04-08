@@ -1,9 +1,13 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
+const asyncRoute = (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) =>
+  (req: Request, res: Response, next: NextFunction) => {
+    void fn(req, res, next).catch(next);
+  };
 
 const createSchema = z.object({
   title: z.string().min(1).default('Instant Meeting'),
@@ -13,7 +17,7 @@ const createSchema = z.object({
 });
 
 // POST /api/meetings — create a meeting
-router.post('/', requireAuth, async (req: Request, res: Response) => {
+router.post('/', requireAuth, asyncRoute(async (req: Request, res: Response) => {
   const parse = createSchema.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ error: parse.error.issues[0].message });
@@ -52,10 +56,10 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
   });
 
   res.status(201).json(meeting);
-});
+}));
 
 // GET /api/meetings — list the authenticated user's meetings
-router.get('/', requireAuth, async (req: Request, res: Response) => {
+router.get('/', requireAuth, asyncRoute(async (req: Request, res: Response) => {
   const meetings = await prisma.meeting.findMany({
     where: {
       participants: { some: { userId: req.user!.userId } },
@@ -69,10 +73,10 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
   });
 
   res.json(meetings);
-});
+}));
 
 // GET /api/meetings/:id — get a single meeting (participant check)
-router.get('/:id', requireAuth, async (req: Request, res: Response) => {
+router.get('/:id', requireAuth, asyncRoute(async (req: Request, res: Response) => {
   const meeting = await prisma.meeting.findFirst({
     where: {
       id: req.params.id,
@@ -93,10 +97,10 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
   }
 
   res.json(meeting);
-});
+}));
 
 // DELETE /api/meetings/:id — cancel (host only)
-router.delete('/:id', requireAuth, async (req: Request, res: Response) => {
+router.delete('/:id', requireAuth, asyncRoute(async (req: Request, res: Response) => {
   const meeting = await prisma.meeting.findUnique({ where: { id: req.params.id } });
 
   if (!meeting) {
@@ -115,10 +119,10 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response) => {
   });
 
   res.json({ success: true });
-});
+}));
 
 // GET /api/meetings/:id/participants — list meeting participants
-router.get('/:id/participants', requireAuth, async (req: Request, res: Response) => {
+router.get('/:id/participants', requireAuth, asyncRoute(async (req: Request, res: Response) => {
   // Verify user has access to this meeting
   const hasAccess = await prisma.participant.findFirst({
     where: { meetingId: req.params.id, userId: req.user!.userId },
@@ -135,10 +139,10 @@ router.get('/:id/participants', requireAuth, async (req: Request, res: Response)
   });
 
   res.json(participants);
-});
+}));
 
 // GET /api/meetings/:id/messages — load chat message history
-router.get('/:id/messages', requireAuth, async (req: Request, res: Response) => {
+router.get('/:id/messages', requireAuth, asyncRoute(async (req: Request, res: Response) => {
   // Verify user has access to this meeting
   const hasAccess = await prisma.participant.findFirst({
     where: { meetingId: req.params.id, userId: req.user!.userId },
@@ -155,6 +159,6 @@ router.get('/:id/messages', requireAuth, async (req: Request, res: Response) => 
   });
 
   res.json(messages);
-});
+}));
 
 export default router;

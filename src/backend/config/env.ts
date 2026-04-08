@@ -7,6 +7,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   APP_ORIGIN: z.string().default('http://localhost:3000'),
+  APP_ORIGINS: z.string().optional(), // comma-separated list for multi-origin deployments
+  TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(1),
 
   // Database
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
