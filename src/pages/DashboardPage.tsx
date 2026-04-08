@@ -68,6 +68,80 @@ function HoverCard({ children, className, onClick }: {
   );
 }
 
+function DashboardMeetingCard({
+  meeting,
+  isUpcoming,
+  onJoin,
+  onCopy,
+  onDelete,
+}: {
+  meeting: Meeting;
+  isUpcoming: boolean;
+  onJoin: (meetingId: string) => void;
+  onCopy: (meetingId: string) => void;
+  onDelete: (meetingId: string) => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const status = meetingStatus(meeting);
+
+  return (
+    <div className="group p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/[0.07] hover:border-white/15 transition-all duration-300">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <h4 className="font-medium text-white truncate">{meeting.title}</h4>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium shrink-0 ${status.color}`}>
+              {status.label}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-sm text-[#86868b]">
+            <Clock className="w-3.5 h-3.5 shrink-0" />
+            <span>
+              {new Date(meeting.scheduledStartAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              {' '}at{' '}
+              {new Date(meeting.scheduledStartAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {isUpcoming && (
+            <button
+              onClick={() => onJoin(meeting.id)}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+            >
+              Join
+            </button>
+          )}
+          <div className="relative">
+            <button onClick={() => setMenuOpen(!menuOpen)} className="p-1 rounded-lg hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100">
+              <MoreVertical className="w-4 h-4 text-white/50" />
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 z-20 bg-[#1a1a2e] border border-white/10 rounded-xl shadow-2xl py-1 min-w-[150px]">
+                  <button
+                    onClick={() => { onCopy(meeting.id); setMenuOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white/80 hover:bg-white/10 transition-colors"
+                  >
+                    <LinkIcon className="w-3.5 h-3.5" /> Copy link
+                  </button>
+                  <button
+                    onClick={() => { onDelete(meeting.id); setMenuOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Memoized calendar grid — safe date parsing, pre-computed maps ─ */
 const CalendarGrid = forwardRef<HTMLDivElement, {
   currentMonth: Date;
@@ -381,69 +455,13 @@ export default function DashboardPage() {
   const totalMeetings = upcomingMeetings.length + pastMeetings.length;
   const recentMeetings = pastMeetings.slice(0, 3);
 
-  /* ── Meeting card sub-component ──────────────────────────────── */
-  const MeetingCard = ({ meeting }: { meeting: Meeting }) => {
-    const [menuOpen, setMenuOpen] = useState(false);
-    const isUpcoming = upcomingMeetings.includes(meeting);
-    const status = meetingStatus(meeting);
-
+  if (!authChecked) {
     return (
-      <div className="group p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/[0.07] hover:border-white/15 transition-all duration-300">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <h4 className="font-medium text-white truncate">{meeting.title}</h4>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium shrink-0 ${status.color}`}>
-                {status.label}
-              </span>
-            </div>
-            <div className="flex items-center gap-3 text-sm text-[#86868b]">
-              <Clock className="w-3.5 h-3.5 shrink-0" />
-              <span>
-                {new Date(meeting.scheduledStartAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                {' '}at{' '}
-                {new Date(meeting.scheduledStartAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {isUpcoming && (
-              <button
-                onClick={() => navigate(`/meeting?id=${meeting.id}`)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
-              >
-                Join
-              </button>
-            )}
-            <div className="relative">
-              <button onClick={() => setMenuOpen(!menuOpen)} className="p-1 rounded-lg hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100">
-                <MoreVertical className="w-4 h-4 text-white/50" />
-              </button>
-              {menuOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute right-0 top-full mt-1 z-20 bg-[#1a1a2e] border border-white/10 rounded-xl shadow-2xl py-1 min-w-[150px]">
-                    <button
-                      onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/meeting?id=${meeting.id}`); toast.success('Link copied'); setMenuOpen(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white/80 hover:bg-white/10 transition-colors"
-                    >
-                      <LinkIcon className="w-3.5 h-3.5" /> Copy link
-                    </button>
-                    <button
-                      onClick={() => { handleDeleteMeeting(meeting.id); setMenuOpen(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Delete
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+      <div className="h-[100dvh] w-full bg-[#050507] text-white flex items-center justify-center font-sans selection:bg-[#00FFFF]/30">
+        <div className="text-sm text-white/60">Loading dashboard...</div>
       </div>
     );
-  };
+  }
 
   /* ── render ───────────────────────────────────────────────────── */
   return (
@@ -718,7 +736,17 @@ export default function DashboardPage() {
                       ) : (
                         <div className="space-y-2">
                           {upcomingMeetings.map(meeting => (
-                            <MeetingCard key={meeting.id} meeting={meeting} />
+                            <DashboardMeetingCard
+                              key={meeting.id}
+                              meeting={meeting}
+                              isUpcoming={upcomingMeetings.some((m) => m.id === meeting.id)}
+                              onJoin={(id) => navigate(`/meeting?id=${id}`)}
+                              onCopy={(id) => {
+                                navigator.clipboard.writeText(`${window.location.origin}/meeting?id=${id}`);
+                                toast.success('Link copied');
+                              }}
+                              onDelete={handleDeleteMeeting}
+                            />
                           ))}
                         </div>
                       )}
