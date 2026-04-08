@@ -450,7 +450,7 @@ export default function LandingPage() {
   const textY = useTransform(heroProgress, [0, 0.15], [0, -50]);
 
   useEffect(() => {
-    const apiBase = import.meta.env.VITE_API_URL ?? '';
+    const apiBase = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL ?? '');
     const controller = new AbortController();
 
     const warmup = async () => {

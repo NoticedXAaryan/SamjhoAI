@@ -384,7 +384,7 @@ export default function MeetingPage() {
   useEffect(() => {
     if (!hasJoined) return;
 
-    const apiBase = import.meta.env.VITE_API_URL ?? '';
+    const apiBase = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL ?? '');
     const socketUrl = apiBase || window.location.origin;
     const socket = io(socketUrl, {
       withCredentials: true,  // Send cookies with WebSocket connection
