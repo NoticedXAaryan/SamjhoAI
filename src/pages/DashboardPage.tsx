@@ -257,7 +257,6 @@ export default function DashboardPage() {
     });
   }, [navigate]);
 
-  if (!authChecked) return null;
 
   // ── view transition ───────────────────────────────────────────────
   const switchView = useCallback((view: 'meetings' | 'calendar' | 'settings') => {
@@ -351,7 +350,9 @@ export default function DashboardPage() {
       toast.success('Joining meeting...');
       navigate(`/meeting?id=${id}`);
     } catch {
-      toast.error('Meeting not found. Please check the code.');
+      // Guest may not yet be a participant; still allow navigation to attempt socket join.
+      toast.message('Trying to join meeting...');
+      navigate(`/meeting?id=${id}`);
     }
   };
 

@@ -100,7 +100,6 @@ export default function MeetingPage() {
       });
   }, [navigate, location]);
 
-  if (!authChecked) return null;
 
   // Pre-join state
   const [hasJoined, setHasJoined] = useState(false);
