@@ -9,7 +9,7 @@
     "dev:backend": "tsx watch src/backend/index.ts",
     "postinstall": "prisma generate --schema ./schema.prisma",
     "start": "tsx server.ts",
-    "start:prod": "prisma migrate deploy --schema ./schema.prisma && tsx server.ts",
+    "start:prod": "prisma db push --schema ./schema.prisma && tsx server.ts",
     "build": "vite build",
     "build:frontend": "vite build",
     "build:backend": "tsc -p tsconfig.backend.json",
