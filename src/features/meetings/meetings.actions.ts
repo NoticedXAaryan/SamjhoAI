@@ -6,6 +6,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
+import { validate, MeetingTitleSchema, RoomNameSchema } from '@/shared/lib/validation';
 import { PrismaMeetingRepository } from './meetings.repository';
 import { MeetingService } from './meetings.service';
 
@@ -26,12 +27,14 @@ function makeService() {
   return new MeetingService(new PrismaMeetingRepository());
 }
 
-export async function createMeeting(title?: string) {
+export async function createMeeting(rawTitle?: string) {
+  const title = validate(MeetingTitleSchema, rawTitle);
   const userId = await requireUserId();
   return makeService().createMeeting(title, userId);
 }
 
-export async function validateAndJoinMeeting(roomName: string) {
+export async function validateAndJoinMeeting(rawRoomName: string) {
+  const roomName = validate(RoomNameSchema, rawRoomName);
   await requireUserId();
   return makeService().validateAndJoin(roomName);
 }
@@ -46,7 +49,8 @@ export async function getPastMeetings() {
   return makeService().getPast(userId);
 }
 
-export async function endMeeting(roomName: string) {
+export async function endMeeting(rawRoomName: string) {
+  const roomName = validate(RoomNameSchema, rawRoomName);
   const userId = await requireUserId();
   return makeService().endMeeting(roomName, userId);
 }

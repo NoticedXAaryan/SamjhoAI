@@ -16,6 +16,9 @@ export class MeetingService implements IMeetingService {
     if (!meeting) {
       throw new Error('Meeting not found or already ended.');
     }
+    if (meeting.status === 'ended') {
+      throw new Error('Meeting has already ended.');
+    }
     if (meeting.status === 'scheduled') {
       await this.repo.markActive(roomName);
     }
