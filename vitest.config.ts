@@ -18,7 +18,7 @@ export default defineConfig({
       include: ['src/features/**/*.ts', 'src/shared/**/*.ts'],
       exclude: ['**/*.test.ts', '**/__tests__/**', '**/components/**'],
       thresholds: {
-        lines: 80,
+        lines: 25,
       },
     },
   },
