@@ -3,6 +3,8 @@ node_modules/
 
 # Build output
 dist/
+.next/
+out/
 
 # Environment variables — NEVER commit these
 .env
@@ -44,6 +46,45 @@ tmp/
 .claude/
 .antigravity/
 .gemini/
+.cursor/
+.vercel/
+.agents/
+.adal/
+.aider-desk/
+.augment/
+.bob/
+.codeartsdoer/
+.codebuddy/
+.codemaker/
+.codestudio/
+.commandcode/
+.continue/
+.cortex/
+.crush/
+.devin/
+.factory/
+.forge/
+.goose/
+.iflow/
+.junie/
+.kilocode/
+.kiro/
+.kode/
+.mcpjam/
+.mux/
+.neovate/
+.openhands/
+.pi/
+.pochi/
+.qoder/
+.qwen/
+.roo/
+.rovodev/
+.tabnine/
+.trae/
+.vibe/
+.windsurf/
+.zencoder/
 
 # wrangler files (removed but ignore just in case)
 .wrangler
@@ -51,6 +92,12 @@ tmp/
 !.dev.vars.example
 !.env.example
 
-# Markdown files (except README)
-*.md
-!README.md
+# Local TS build cache
+tsconfig.tsbuildinfo
+
+# Archived experiments / legacy
+archive/
+
+# Cursor skills / generated metadata
+skills/
+skills-lock.json

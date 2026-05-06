@@ -1,507 +1,2093 @@
-# Production Roadmap — Samjho
+# 🗺️ Samjho AI — Master Roadmap
 
-> Target: support 100 concurrent users (scalable beyond that).
-> Each step is short, independently testable, and has acceptance criteria (AC) at the end.
-> Any AI model (Claude, Cursor, GPT, etc.) can pick up from any step and continue.
+<div align="center">
+
+**Status:** 35% → Target 95% Production Ready  
+**Timeline:** 12–16 weeks · 8 Sprints  
+**Auth:** Better Auth (self-hosted, free, no MAU limits)  
+**UI:** shadcn/ui + TailwindCSS v4  
+**Architecture:** Feature-modules · Repository pattern · SOLID  
+**Last Updated:** May 6, 2026
+
+</div>
+
+> **One rule:** Read this file top to bottom once before touching any code. Every decision is explained here. The landing page is **never touched**.
 
 ---
 
-## Project Anatomy (for context)
+## 📋 Current State Audit
+
+| Area | Score | Status |
+|------|-------|--------|
+| Authentication | 20% ❌ | Clerk is a paid external service with MAU limits — replacing with Better Auth |
+| Video Engine | 40% 🟡 | LiveKit configured, controls missing |
+| UI Framework | 75% 🟡 | Landing page done, app screens missing |
+| Database | 30% 🟡 | Prisma + Neon Postgres is the single DB — remove MongoDB remnants |
+| Real-Time Captions | 5% ❌ | Detected locally, never broadcast |
+| Architecture | 10% ❌ | Flat file dump, no separation of concerns, no SOLID |
+| Error Handling | 10% ❌ | No validation, no boundaries, no recovery |
+| Security | 30% ❌ | No API protection, no rate limiting, no security headers |
+| Testing | 0% ❌ | Zero tests |
+
+---
+
+## 🔴 Decisions Made (Non-Negotiable)
+
+**1. Replace Clerk → Better Auth**
+Clerk is a third-party SaaS with a free tier capped at 10,000 MAU. Better Auth is self-hosted, MIT-licensed, has no MAU limits, and is owned by you. It supports email/password and OAuth providers out of the box. Migration is a one-time Sprint 0 task.
+
+**2. Standardize on Prisma + Neon Postgres**
+Neon Postgres is the single database. Prisma is the single schema + migration workflow. Remove MongoDB usage and any dual-DB ambiguity.
+
+**3. Move old/unused code to `_legacy/`**
+Do not delete old files immediately. Move them to `src/_legacy/` with a README. Review and delete at Sprint 7 QA. This avoids accidental loss of logic that may still be referenced.
+
+**4. Feature-module architecture (SOLID)**
+Each feature is a self-contained folder with its own types, repository, service, actions, and components. Nothing imports across feature boundaries except through `shared/`. This enforces Single Responsibility and Interface Segregation.
+
+**5. Repository + Service pattern**
+Data access goes in `.repository.ts`. Business logic goes in `.service.ts`. Server actions are thin wrappers that call services. UI components call server actions only. No component touches a database directly.
+
+**6. shadcn/ui — no other UI library**
+shadcn/ui copies components into your codebase, has zero runtime overhead, is built on Radix UI (accessible by default), and works natively with TailwindCSS v4. No other component library is needed.
+
+---
+
+## 📦 Package Cleanup
+
+### Remove these completely
+
+```bash
+# Clerk
+npm uninstall @clerk/nextjs @clerk/clerk-sdk-node @clerk/backend
+
+# Svix (was only used for Clerk webhooks)
+npm uninstall svix
+
+# Remove DB remnants (only if present)
+# - MongoDB helpers / adapters you no longer use
+# - any "dual DB" wiring (Mongo + Prisma) that creates ambiguity
+```
+
+Delete all imports of `@clerk/nextjs` from every file before installing Better Auth. Search for them:
+
+```bash
+grep -r "@clerk" src/ --include="*.ts" --include="*.tsx" -l
+```
+
+Move those files to `src/_legacy/` rather than deleting them — extract any business logic you want to keep first.
+
+### Add these
+
+```bash
+# Auth
+npm install better-auth
+
+# Validation (if not already installed)
+npm install zod
+
+# Password hashing (Better Auth uses this internally, but good to be explicit)
+# better-auth installs its own — no manual install needed
+```
+
+### Keep these (no changes)
 
 ```
-accessibility-video-conferencing/
-├── schema.prisma                  ← DB schema (User, Meeting, Participant, Message)
-├── server.ts                      ← Entry point, bootstraps Express + Vite middleware
-├── render.yaml                    ← Render deploy config
-├── .env / .env.example            ← Environment variables
-├── src/
-│   ├── App.tsx                    ← Router (/, /auth, /dashboard, /meeting, /download)
-│   ├── main.tsx                   ← React entry point
-│   ├── pages/
-│   │   ├── LandingPage.tsx        ← Marketing landing
-│   │   ├── AuthPage.tsx           ← Login/Register
-│   │   ├── DashboardPage.tsx      ← Meeting list, schedule, calendar, device settings (static)
-│   │   ├── MeetingPage.tsx        ← Active meeting (video, WebRTC, Socket, chat, captions)
-│   │   └── DownloadPage.tsx
-│   ├── components/ui/Effects.tsx  ← CursorGlow, NoiseOverlay
-│   ├── store/useAppStore.ts       ← Zustand store (minimal, unused for now)
+next, react, react-dom
+typescript
+tailwindcss
+@livekit/components-react, @livekit/components-styles, livekit-client, livekit-server-sdk
+mongodb
+lucide-react
+motion (Framer Motion — used by landing page)
+```
+
+### Final `package.json` dependencies (target state)
+
+```json
+{
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "better-auth": "^1.0.0",
+    "mongodb": "^6.0.0",
+    "livekit-server-sdk": "^2.0.0",
+    "@livekit/components-react": "^2.0.0",
+    "@livekit/components-styles": "^1.0.0",
+    "livekit-client": "^2.0.0",
+    "zod": "^3.0.0",
+    "lucide-react": "^0.400.0",
+    "motion": "^11.0.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.0.0",
+    "tailwind-merge": "^2.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "vitest": "^2.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "@testing-library/react": "^16.0.0",
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0"
+  }
+}
+```
+
+---
+
+## 🏗️ Target Architecture
+
+### SOLID Principles Applied
+
+**S — Single Responsibility**
+Every file has exactly one reason to change. `MeetingRepository` only handles data access. `MeetingService` only handles business logic. `MeetingCard` only renders one card.
+
+**O — Open/Closed**
+Features extend the system without modifying existing code. Adding a new caption type means adding a new type to the union and a new handler — not editing existing handlers.
+
+**L — Liskov Substitution**
+All repositories implement a shared interface. Any implementation (MongoDB, in-memory for tests) can replace another without breaking callers.
+
+**I — Interface Segregation**
+Types are small and focused. `CreateMeetingInput` is not the same as `Meeting`. Components receive only the props they need — no fat prop objects.
+
+**D — Dependency Inversion**
+Server actions depend on `IMeetingService` interface, not on `MeetingService` concretion. This makes testing trivial — inject a mock service.
+
+---
+
+### Folder Structure (Target State After All Sprints)
+
+```
+src/
+│
+├── app/                              # Next.js App Router — routing only
+│   ├── (auth)/                       # Public auth routes
+│   │   ├── sign-in/
+│   │   │   └── page.tsx
+│   │   └── sign-up/
+│   │       └── page.tsx
+│   ├── (app)/                        # Protected route group
+│   │   ├── layout.tsx                # Session guard — redirect if not authed
+│   │   ├── dashboard/
+│   │   │   └── page.tsx              # Thin — just calls features/meetings
+│   │   └── meeting/
+│   │       └── [roomId]/
+│   │           ├── page.tsx          # Thin — validates room, renders MeetingRoom
+│   │           └── summary/
+│   │               └── page.tsx      # Thin — renders transcript
+│   ├── api/
+│   │   ├── auth/
+│   │   │   └── [...all]/
+│   │   │       └── route.ts          # Better Auth — single catch-all handler
+│   │   └── livekit/
+│   │       └── token/
+│   │           └── route.ts          # LiveKit token (server-only)
+│   ├── layout.tsx                    # Root layout — no auth provider needed
+│   └── globals.css
+│
+├── features/                         # Self-contained feature modules
+│   │
+│   ├── auth/                         # Everything auth-related
+│   │   ├── auth.server.ts            # Better Auth instance (server-side)
+│   │   ├── auth.client.ts            # Better Auth client hooks
+│   │   ├── session.ts                # getSession() — used by (app)/layout.tsx
+│   │   └── components/
+│   │       ├── SignInForm.tsx
+│   │       ├── SignUpForm.tsx
+│   │       └── UserMenu.tsx          # Replaces Clerk <UserButton />
+│   │
+│   ├── meetings/                     # Meeting CRUD and dashboard
+│   │   ├── meetings.types.ts         # Interfaces only — no implementation
+│   │   ├── meetings.repository.ts    # IMeetingRepository + MongoMeetingRepository
+│   │   ├── meetings.service.ts       # IMeetingService + MeetingService
+│   │   ├── meetings.actions.ts       # Server actions — thin wrappers
+│   │   └── components/
+│   │       ├── HeroCard.tsx
+│   │       ├── MeetingCard.tsx
+│   │       ├── MeetingCardSkeleton.tsx
+│   │       ├── PastMeetingRow.tsx
+│   │       └── DashboardHeader.tsx
+│   │
+│   ├── room/                         # In-meeting experience
+│   │   ├── room.types.ts
+│   │   ├── room.service.ts           # Token generation, room validation
+│   │   └── components/
+│   │       ├── MeetingRoom.tsx       # LiveKit shell
+│   │       ├── VideoGrid.tsx
+│   │       ├── ControlBar.tsx
+│   │       ├── ParticipantSidebar.tsx
+│   │       ├── MeetingTopBar.tsx
+│   │       └── AccessibilitySheet.tsx
+│   │
+│   └── captions/                     # Caption broadcast and display
+│       ├── captions.types.ts
+│       ├── captions.repository.ts    # Transcript persistence
+│       ├── captions.service.ts       # Broadcast logic
+│       ├── captions.actions.ts       # saveCaptionSegment server action
+│       └── components/
+│           └── RealtimeCaptions.tsx
+│
+├── shared/                           # Cross-feature shared code
+│   ├── components/
+│   │   └── ui/                       # shadcn/ui — do not edit manually
+│   ├── db/
+│   │   ├── client.ts                 # MongoDB singleton connection
+│   │   └── setup.ts                  # Index creation script
+│   ├── hooks/
+│   │   ├── useSpeechToText.ts
+│   │   └── useGestureDetection.ts
 │   ├── lib/
-│   │   ├── api.ts                 ← Frontend API client (auth + meetings)
-│   │   ├── utils.ts               ← cn() helper (clsx+tailwind-merge)
-│   │   ├── useMeetingMedia.ts     ← Hook: MediaPipe hand tracking, Web Speech STT, audio analyser
-│   │   └── useMediaDevices.ts     ← Hook: enumerateDevices device selection
-│   └── backend/
-│       ├── index.ts               ← Express app + Socket.IO setup
-│       ├── config/env.ts          ← Zod-validated env vars
-│       ├── lib/prisma.ts          ← Prisma singleton
-│       ├── lib/jwt.ts             ← JWT sign/verify
-│       ├── middleware/auth.ts     ← requireAuth middleware
-│       ├── routes/
-│       │   ├── auth.ts            ← POST /register, /login, /refresh, GET /me, POST /logout
-│       │   └── meetings.ts       ← CRUD: create, list, get, delete, participants, messages
-│       └── socket/index.ts        ← Socket.IO: join-room, chat, WebRTC signaling, state-change
-└── package.json                   ← Scripts: dev, build, start, prisma:*
+│   │   ├── livekit.ts                # CaptionBroadcaster + parseCaptionPacket
+│   │   ├── validation.ts             # Shared Zod schemas
+│   │   └── utils.ts                  # cn(), formatDuration(), etc.
+│   └── middleware.ts                 # Rate limiting + security headers
+│
+├── middleware.ts                     # Next.js middleware — auth guard
+│
+└── _legacy/                          # Deprecated — review at Sprint 7, then delete
+    ├── README.md                     # "Do not import from here"
+    ├── clerk-auth/                   # Old Clerk integration
+    ├── prisma/                       # Old Prisma schema + client
+    └── old-actions/                  # Old flat server actions
+```
+
+### Import Rules
+
+These rules prevent circular dependencies and keep the architecture clean:
+
+```
+app/          → features/, shared/          ✅
+features/     → shared/                     ✅
+features/     → other features/             ❌  (never cross-import features)
+shared/       → features/                   ❌  (shared knows nothing about features)
+_legacy/      → anywhere                    ❌  (nothing imports from _legacy)
 ```
 
 ---
 
-## Phase-by-Phase Roadmap
+## 🗺️ UX Flow
 
-### PHASE 1 — Fix Local Dev & First Smoke Test
-Make sure `npm run dev` boots, you can log in, create a meeting, and join it.
+The landing page is untouched. Every screen below it is new.
 
-#### Step 1.1 — Verify dev build boots
-- Run: `npm run dev`
-- Verify the server starts on `http://localhost:3000`
-- Open in browser, confirm landing page renders
-- **AC**: Landing page loads without errors in console
-
-#### Step 1.2 — Verify auth works end-to-end
-- Navigate to `/auth`, register a new account
-- Confirm redirect to `/dashboard`
-- Check localStorage for `accessToken`, `refreshToken`, `user`
-- Logout, verify redirect to `/`
-- **AC**: Register → Dashboard → Logout → Login cycle works
-
-#### Step 1.3 — Verify dashboard API calls
-- Open dashboard, verify your network tab shows a `GET /api/meetings` call
-- Click "New Meeting" → should create a DB record and navigate to `/meeting?id=...`
-- **AC**: Meeting created in DB (verify via Prisma Studio: `npm run prisma:studio`)
-
-#### Step 1.4 — Fix known bug: `createPeerConnection` removed from useReducer
-- In MeetingPage.tsx, `useEffect` for Socket.io lists `createPeerConnection` in deps but function is `useCallback` — verify the dependency array is correct.
-- Verify the current code builds without errors: `npx tsc --noEmit`
-- **AC**: `npx tsc --noEmit` returns zero errors
-
-#### Step 1.5 — Test WebSocket connection
-- Join a meeting page, open browser dev tools → Network → WS
-- Confirm `socket.io` connection succeeds (status 101)
-- **AC**: Socket connects, no auth errors in server logs
-
----
-
-### PHASE 2 — Wire up Real Media Pipeline (Current code exists but partially)
-
-These features already exist in `useMeetingMedia.ts` but were not fully wired into MeetingPage. The wiring is already done.
-
-#### Step 2.1 — Verify hand tracking loads
-- Open a meeting with video ON
-- Open browser console, confirm no `MediaPipe` import errors
-- Show your hand to the camera
-- **AC**: Bottom-left self-view shows "Detected: ✋ Open Palm" (or similar) in the HandTrackingIndicator badge
-
-#### Step 2.2 — Verify speech-to-text works
-- Speak while AI toggle is ON
-- Bottom of meeting screen should show real-time transcript text in CaptionsOverlay
-- **AC**: Your spoken words appear as captions (interim then final) in the meeting UI
-
-#### Step 2.3 — Verify gesture-to-caption pipeline
-- Make a recognizable gesture (✋, ✌️, 👍, ✊, etc.)
-- **AC**: HandTrackingIndicator shows the detected gesture; CaptionsOverlay shows "Sign detected: [gesture]" when no speech is happening
-
-#### Step 2.4 — Verify AI toggle controls everything
-- Toggle AI button OFF
-- **AC**: Captions freeze, hand tracking stops, speech recognition stops (verify `stopHandTracking()` called, SpeechRecognition stopped)
-
-#### Step 2.5 — Test device selection
-- Open settings (gear icon) in meeting
-- Select a different microphone/camera from dropdown
-- **AC**: Video feed switches to the new camera, audio uses the new mic
-
----
-
-### PHASE 3 — Real-Time Speaking Indicator (Audio Analyser)
-
-#### Step 3.1 — Verify speaking detection on local user is visible
-- This should already work via the `createSpeakingAnalyser()` in useMeetingMedia.
-- Open meeting, speak into mic
-- **AC**: The participant list should show an audio meter or green dot for the local user when speaking
-
-#### Step 3.2 — Add speaking indicator to speaker tile
-- In MeetingPage, the local user's self-view tile needs an `isSpeaking` indicator.
-- Create a `isLocalSpeaking` state from the analyser (currently only works for remote).
-- Add a green pulsing dot to the self-view tile when `isLocalSpeaking` is true.
-- **AC**: Self-view tile gets a green speaking indicator when you speak
+```
+┌─────────────────────────────────────────────────────────┐
+│  LANDING PAGE  /  (existing — never touch)              │
+└───────────────────┬─────────────────────────────────────┘
+                    │  [Sign In] / [Get Started]
+                    ▼
+┌─────────────────────────────────────────────────────────┐
+│  SIGN IN  /sign-in                                      │
+│  Email + Password form (Better Auth)                    │
+│  [Sign in with Google] (optional OAuth)                 │
+│  "Don't have an account? Sign up"                       │
+└───────────────────┬─────────────────────────────────────┘
+                    │  session cookie set
+                    ▼
+┌─────────────────────────────────────────────────────────┐
+│  DASHBOARD  /dashboard                                  │
+│                                                         │
+│  ┌─ Header ──────────────────────────────────────────┐ │
+│  │  🤟 Samjho              [avatar] [name] [sign out]│ │
+│  └───────────────────────────────────────────────────┘ │
+│                                                         │
+│  ┌─ Hero Card ───────────────────────────────────────┐ │
+│  │  "Welcome back, [name]"                           │ │
+│  │  [▶ New Meeting]    [Room code ____] [→ Join]     │ │
+│  └───────────────────────────────────────────────────┘ │
+│                                                         │
+│  Upcoming  ──────────────────────────────────────────  │
+│  [Card: title · time · n👤 · Join]  ×3 per row         │
+│                                                         │
+│  Past Meetings  ─────────────────────────────────────  │
+│  row: title · date · duration · [↓ Transcript]         │
+└───────────────────┬─────────────────────────────────────┘
+                    │  [New Meeting] → creates + saves to DB
+                    │  [Join]        → validates roomId → enters
+                    ▼
+┌─────────────────────────────────────────────────────────┐
+│  MEETING ROOM  /meeting/[roomId]                        │
+│                                                         │
+│  ┌─ Top bar ─────────────────────────────────────────┐ │
+│  │  Title          ●Live  🕐 12:34    [👥 3 people]  │ │
+│  └───────────────────────────────────────────────────┘ │
+│                                                         │
+│  ┌─ Video Grid ───────────────────┐ ┌─ Sidebar ──────┐ │
+│  │  [Tile]  [Tile]                │ │ ● Alice         │ │
+│  │  [Tile]  [You]                 │ │ ● Bob  🔇        │ │
+│  │                                │ │ ● You   HOST   │ │
+│  │  ┌── Captions overlay ───────┐ │ └────────────────┘ │
+│  │  │ Alice: "Can you hear me?" │ │                    │
+│  │  │ 🤟 Bob: ASL_HELLO        │ │                    │
+│  │  └───────────────────────────┘ │                    │
+│  └────────────────────────────────┘                    │
+│                                                         │
+│  ┌─ Control bar ─────────────────────────────────────┐ │
+│  │      [🎤]   [📷]   [🖥]   │   [⚙]   [📞 End]    │ │
+│  └───────────────────────────────────────────────────┘ │
+└───────────────────┬─────────────────────────────────────┘
+                    │  End Call (confirmation dialog)
+                    ▼
+┌─────────────────────────────────────────────────────────┐
+│  SUMMARY  /meeting/[roomId]/summary                     │
+│                                                         │
+│  "Meeting ended · 45 min"                               │
+│  ┌─ Transcript ──────────────────────────────────────┐ │
+│  │ 12:03 Alice  "Can everyone hear me?"              │ │
+│  │ 12:04 🤟 Bob  ASL_HELLO                           │ │
+│  │ 12:05 You    "Yes, loud and clear"                │ │
+│  └───────────────────────────────────────────────────┘ │
+│  [↓ Download .txt]          [← Back to Dashboard]      │
+└─────────────────────────────────────────────────────────┘
+```
 
 ---
 
-### PHASE 4 — WebRTC Hardening (Critical for 100 users)
-#### Step 4.1 — Add Coturn/TURN server support
-- Add TURN server ICE config in `createPeerConnection`:
-  ```ts
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: process.env.TURN_URL, username: process.env.TURN_USER, credential: process.env.TURN_PASS }
-  ]
-  ```
-- Add `TURN_URL`, `TURN_USER`, `TURN_PASS` to `.env` and schema in `env.ts`
-- **AC**: `createPeerConnection` sends TURN credentials, no build errors
+## 🎨 UI: shadcn/ui Setup
 
-#### Step 4.2 — Test WebRTC between two different browsers
-- Open two browser tabs (different profiles or Chrome + Firefox)
-- Log in as User A, create meeting, open link in User B
-- **AC**: Both users see each other's video (not just black screens or loading spinners)
+Install once in Sprint 0, extend per sprint:
 
-#### Step 4.3 — Fix the "existing-participants" race condition
-- Current code sends `user-connected` event to others BEFORE the answer/offer is ready
-- Modify `socket/index.ts` to delay `user-connected` until after peer connection is created
-- **AC**: Adding a third participant doesn't break video for participants 1 or 2
+```bash
+npx shadcn@latest init
+# Prompts:
+# Style        → Default
+# Base color   → Slate
+# CSS vars     → Yes
+```
 
-#### Step 4.4 — Add connection recovery
-- When a peer's WebRTC connection state is `failed`, attempt to restart ICE:
-  ```ts
-  pc.onconnectionstatechange = () => {
-    if (pc.connectionState === 'failed') {
-      pc.restartIce();
+**Brand tokens — paste into `app/globals.css` after shadcn init:**
+
+```css
+@layer base {
+  :root {
+    --background:         0 0% 2%;      /* #050507 — existing brand bg */
+    --foreground:         0 0% 98%;
+    --card:               0 0% 4%;
+    --card-foreground:    0 0% 98%;
+    --border:             0 0% 10%;
+    --input:              0 0% 8%;
+    --primary:            187 100% 50%; /* cyan — brand accent */
+    --primary-foreground: 0 0% 2%;
+    --muted:              0 0% 8%;
+    --muted-foreground:   0 0% 55%;
+    --accent:             187 100% 10%;
+    --destructive:        0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --radius:             0.75rem;
+  }
+}
+```
+
+**Add components per sprint — only when needed:**
+
+```bash
+# Sprint 0
+npx shadcn@latest add button input label card badge avatar skeleton
+
+# Sprint 1
+npx shadcn@latest add tooltip
+
+# Sprint 2
+npx shadcn@latest add sheet scroll-area separator
+
+# Sprint 3
+npx shadcn@latest add switch select alert-dialog dropdown-menu
+
+# Sprint 4
+npx shadcn@latest add form toast
+```
+
+---
+
+## ⚡ Sprint-by-Sprint Plan
+
+---
+
+### Sprint 0 (Week 0): Clean Slate
+**Goal:** Erase technical debt before writing a single new line.
+
+**Order matters. Do not skip steps.**
+
+**Step 1 — Uninstall packages:**
+```bash
+npm uninstall @clerk/nextjs @clerk/clerk-sdk-node @clerk/backend
+npm uninstall prisma @prisma/client
+npm uninstall svix
+```
+
+**Step 2 — Audit all imports, move old files to `_legacy/`:**
+```bash
+mkdir -p src/_legacy/clerk-auth src/_legacy/prisma src/_legacy/old-actions
+
+# Move old Clerk files
+mv src/middleware.ts src/_legacy/clerk-auth/middleware.ts
+# (move any other Clerk-importing files similarly)
+
+# Move Prisma directory
+mv prisma/ src/_legacy/prisma/
+
+# Create _legacy README
+cat > src/_legacy/README.md << 'EOF'
+# _legacy/
+
+These files are deprecated and must not be imported anywhere.
+They exist only as reference during migration.
+Delete this entire folder at Sprint 7 QA sign-off.
+
+- clerk-auth/   — old Clerk middleware and auth helpers
+- prisma/       — old Prisma schema and client
+- old-actions/  — old flat server actions
+EOF
+```
+
+**Step 3 — Install new packages:**
+```bash
+npm install better-auth zod
+npx shadcn@latest init
+npx shadcn@latest add button input label card badge avatar skeleton
+```
+
+**Step 4 — Create folder skeleton:**
+```bash
+mkdir -p src/features/auth/components
+mkdir -p src/features/meetings/components
+mkdir -p src/features/room/components
+mkdir -p src/features/captions/components
+mkdir -p src/shared/db
+mkdir -p src/shared/hooks
+mkdir -p src/shared/lib
+mkdir -p src/shared/components/ui
+```
+
+**Sprint 0 Deliverable:** `npm run build` succeeds (with stub pages). Zero Clerk/Prisma imports outside `_legacy/`. Clean folder structure in place.
+
+---
+
+### Sprint 1 (Weeks 1–2): Better Auth + Database
+**Goal:** Working authentication (sign in, sign up, session) and real meeting persistence.
+
+#### 1.1 — Prisma + Neon (single DB)
+
+**Database:** Neon Postgres  
+**Schema + migrations:** Prisma (`prisma/schema.prisma`)  
+**Connection:** `DATABASE_URL` (never commit real credentials)
+
+```typescript
+// src/lib/prisma.ts
+import { PrismaClient } from '@prisma/client';
+
+declare global {
+  // eslint-disable-next-line no-var
+  var prisma: PrismaClient | undefined;
+}
+
+export const prisma = globalThis.prisma ?? new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') globalThis.prisma = prisma;
+```
+
+**Apply schema to Neon (dev):**
+
+```bash
+npx prisma db push
+```
+
+**Preferred for production:** use Prisma migrations (`npx prisma migrate dev` locally, deploy migrations in CI).
+
+#### 1.2 — Better Auth Setup
+
+```typescript
+// src/features/auth/auth.server.ts
+
+import { betterAuth } from 'better-auth';
+import { mongodbAdapter } from 'better-auth/adapters/mongodb';
+import { getDb } from '@/shared/db/client';
+
+const db = await getDb();
+
+export const auth = betterAuth({
+  database: mongodbAdapter(db),
+
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: false, // set true in production with SMTP configured
+  },
+
+  // Optional: add Google OAuth
+  // socialProviders: {
+  //   google: {
+  //     clientId: process.env.GOOGLE_CLIENT_ID!,
+  //     clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  //   },
+  // },
+
+  session: {
+    expiresIn: 60 * 60 * 24 * 7,         // 7 days
+    updateAge: 60 * 60 * 24,              // refresh if older than 1 day
+    cookieCache: { enabled: true, maxAge: 60 * 5 },
+  },
+
+  trustedOrigins: [process.env.NEXT_PUBLIC_APP_URL!],
+});
+```
+
+```typescript
+// src/features/auth/auth.client.ts
+
+import { createAuthClient } from 'better-auth/react';
+
+export const authClient = createAuthClient({
+  baseURL: process.env.NEXT_PUBLIC_APP_URL!,
+});
+
+// Re-export the hooks you'll use across the app
+export const {
+  useSession,
+  signIn,
+  signUp,
+  signOut,
+} = authClient;
+```
+
+```typescript
+// src/features/auth/session.ts
+// Server-side session helper — used in server components and route handlers
+
+import { auth } from './auth.server';
+import { headers } from 'next/headers';
+
+export async function getSession() {
+  return auth.api.getSession({ headers: await headers() });
+}
+
+export async function requireSession() {
+  const session = await getSession();
+  if (!session) throw new Error('Unauthorized');
+  return session;
+}
+```
+
+#### 1.3 — Auth API Route (single catch-all)
+
+```typescript
+// src/app/api/auth/[...all]/route.ts
+
+import { auth } from '@/features/auth/auth.server';
+import { toNextJsHandler } from 'better-auth/next-js';
+
+export const { GET, POST } = toNextJsHandler(auth);
+```
+
+#### 1.4 — Next.js Middleware (auth guard)
+
+```typescript
+// src/middleware.ts
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getSessionFromRequest } from 'better-auth/next-js';
+import { auth } from '@/features/auth/auth.server';
+
+const PROTECTED = ['/dashboard', '/meeting'];
+const AUTH_PAGES = ['/sign-in', '/sign-up'];
+
+// In-memory rate limiter (swap for Upstash Redis when scaling)
+const rl = new Map<string, { n: number; reset: number }>();
+
+function isRateLimited(key: string, max = 60): boolean {
+  const now = Date.now();
+  const e = rl.get(key) ?? { n: 0, reset: now + 60_000 };
+  if (now > e.reset) { rl.set(key, { n: 1, reset: now + 60_000 }); return false; }
+  if (e.n >= max) return true;
+  e.n++;
+  rl.set(key, e);
+  return false;
+}
+
+function addSecurityHeaders(res: NextResponse): NextResponse {
+  res.headers.set('X-Frame-Options', 'DENY');
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+  res.headers.set('X-XSS-Protection', '1; mode=block');
+  res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  return res;
+}
+
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
+
+  // Rate limit — 60 req/min per IP per path
+  if (isRateLimited(`${ip}:${pathname}`)) {
+    return new NextResponse('Too Many Requests', { status: 429 });
+  }
+
+  const isProtectedRoute = PROTECTED.some(p => pathname.startsWith(p));
+  const isAuthPage = AUTH_PAGES.some(p => pathname.startsWith(p));
+
+  if (isProtectedRoute || isAuthPage) {
+    const session = await getSessionFromRequest(req, auth);
+
+    if (isProtectedRoute && !session) {
+      const url = req.nextUrl.clone();
+      url.pathname = '/sign-in';
+      url.searchParams.set('redirect', pathname);
+      return addSecurityHeaders(NextResponse.redirect(url));
     }
-  };
-  ```
-- **AC**: Brief network drop doesn't permanently disconnect a user's video
 
-#### Step 4.5 — Handle the "only one user in meeting" scenario
-- When a user is alone, the video area shows "Waiting for others to join..." (already implemented).
-- Verify it looks good (centered, readable).
-- **AC**: Single-user meeting page is visually clean, no errors
-
-#### Step 4.6 — Test 5-party call (local simulation)
-- Open 5 tabs, all join same meeting
-- **AC**: All 5 participants see all others (4 remote + self), audio doesn't feedback-loop (all remotes should be muted on self), video loads for each
-
----
-
-### PHASE 5 — Security & Rate Limiting
-#### Step 5.1 — Add `express-rate-limit`
-- Install: `npm i express-rate-limit`
-- Rate limit auth endpoints: 5 requests per 60 seconds on `/api/auth/login` and `/api/auth/register`
-- **AC**: Brute force script gets `429 Too Many Requests` after 5 attempts
-
-#### Step 5.2 — Add `helmet` security headers properly
-- `helmet` is already installed and used with `contentSecurityPolicy: false`.
-- Re-enable CSP for production with appropriate `script-src` and `connect-src` directives
-- **AC**: `curl -I http://localhost:3000` shows security headers
-
-#### Step 5.3 — CSRF protection
-- For socket auth via `accessToken`, JWT validation exists
-- Add rate limiting on socket connections (max 10 per minute per IP)
-- **AC**: Can't flood socket connections
-
----
-
-### PHASE 6 — Production Infrastructure
-#### Step 6.1 — Add health check endpoint with DB connectivity
-- Current: `/health` only returns `{status: "ok", timestamp}` — doesn't check DB
-- Modify `/health` to ping Prisma with `SELECT 1`
-- If DB fails, return 503
-- **AC**: When DB is down, health check returns 503 (monitors can alert)
-
-#### Step 6.2 — Fix Neon cold start issue
-- Render starts before Neon wakes up → Prisma migration fails
-- Add a startup script in `server.ts` that retries DB connection before serving
-- ```ts
-  async function waitForDB(retries = 10, delayMs = 3000) {
-    for (let i = 0; i < retries; i++) {
-      try { await prisma.$queryRaw`SELECT 1`; return; }
-      catch { if (i === retries-1) throw; await sleep(delayMs); }
+    if (isAuthPage && session) {
+      const url = req.nextUrl.clone();
+      url.pathname = '/dashboard';
+      return addSecurityHeaders(NextResponse.redirect(url));
     }
   }
-  ```
-- **AC**: Render deploy succeeds even with cold-start DB
 
-#### Step 6.3 — Add Neon DB keepalive cron
-- Add `/api/cron/warmup` endpoint that verifies DB connection
-- Set up a free cron job (like cron-job.org or UptimeRobot) to hit it every 4 minutes
-- **AC**: DB stays warm, first request after idle loads in <2 seconds
+  return addSecurityHeaders(NextResponse.next());
+}
 
----
-
-### PHASE 7 — Socket Reconnection & State Recovery
-#### Step 7.1 — Implement socket auto-reconnect ✅ DONE
-- Added `rejoin-room` server handler that sends back existing participants without broadcasting `user-connected` to others
-- Frontend uses `initialConnect` flag to emit `join-room` once, then `rejoin-room` on reconnect
-- **AC**: ✅ If you kill the server and restart it, the frontend automatically reconnects and rejoins the meeting room
-
-#### Step 7.2 — Catch up on missed messages ✅ DONE
-- On reconnect, `meetingsApi.messages(meetingId)` is called to refetch all chat messages
-- Toast notification shows "Reconnected to meeting"
-- **AC**: ✅ Reconnecting user's chat shows all previous messages
-
-#### Step 7.3 — Meeting auto-completed when empty
-- Server socket `disconnect` handler checks if room is empty; if so, marks meeting as `COMPLETED` in DB
-- **AC**: Last person leaving marks meeting as completed
-
-#### Step 7.4 — Test reconnect by simulating a drop
-- Use Chrome DevTools → Network → Offline, wait 5 seconds, go Online
-- **AC**: User reconnects within 10 seconds, video resumes, chat is intact
-
----
-
-### PHASE 8 — Performance & Scale
-#### Step 8.1 — Lazy-load expensive components
-- `MeetingPage` loads MediaPipe (`@mediapipe/tasks-vision`) on first render
-- Move the dynamic import to a lazy hook or code-split it
-- **AC**: MeetingPage initial bundle loads 100ms+ faster (measure with Lighthouse)
-
-#### Step 8.2 — Optimize MediaPipe to run in a Web Worker
-- Hand tracking runs on the main thread, can block UI
-- Move MediaPipe `HandLandmarker` to a Web Worker (`worker.ts`)
-- PostMessage landmarks back to main thread
-- **AC**: Hand tracking doesn't cause frame drops in the meeting
-
-#### Step 8.3 — Add connection stats for remote participants
-- Display latency/packet loss in the sidebar for debugging
-- **AC**: Connection stats visible in participants tab
-
-#### Step 8.4 — Reduce memory leak risk ✅ DONE
-- Fixed `requestAnimationFrame` leak in `registerSpeakingAnalyser` — stores `rafId` in analyser object, cancels on unregister
-- Meeting leave now stops local media tracks, hand tracking, speaking analysers, and clears all peer connections
-- **AC**: `chrome://webrtc-internals` shows clean cleanup, no lingering connections
-
----
-
-### PHASE 9 — Polish & Production Readiness
-#### Step 9.1 — Add error boundary
-- Wrap the app in a React `ErrorBoundary` component
-- Show a recovery screen if the app crashes (with reload button)
-- **AC**: Intentional crash shows error page, not white screen
-
-#### Step 9.2 — Add toast notifications
-- Install `sonner` or `react-hot-toast`
-- Show toasts for: connected, disconnected, error, muted, screen sharing
-- **AC**: User actions show feedback toasts
-
-#### Step 9.3 — Add loading skeletons
-- Dashboard → loading state while fetching meetings
-- Meeting page → loading state during media device setup
-- **AC**: No blank screens during API/network fetches
-
-#### Step 9.4 — Fix participant tile key warnings
-- In `ParticipantTile`, `keyProp` usage is wrong — it's passed as `keyProp={p.id}` but the map already has `key={p.id}` (for some calls). Clean this up.
-- **AC**: Console has zero React key warnings for participant tiles
-
-#### Step 9.5 - Accessibility audit
-- Tab navigation works across all controls (mute, video, join, leave)
-- Screen reader announces: "you are muted", "user joined", "new message from X"
-- **AC**: Lighthouse accessibility score > 90
-
----
-
-### PHASE 10 — ML Model Integration (Custom Sign Language Recognition)
-> The custom ML model will replace/supplement the MediaPipe gesture classification.
-> This phase prepares the pipeline for model serving, real-time inference, and result broadcasting.
-
-#### Step 10.1 — ML Backend Endpoints
-- Add `POST /api/ml/inference` endpoint that accepts base64-encoded hand landmark data or image frames
-- Add `GET /api/model/status` to check if the ML model is loaded and ready
-- Add WebSocket event `ml-result` to broadcast real-time gesture predictions to all meeting participants
-- **AC**: ML endpoint responds with gesture prediction in <50ms; all participants in meeting receive results
-
-#### Step 10.2 — Frontend ML Pipeline Integration
-- In `useMeetingMedia.ts`, send detected hand landmarks to custom ML model instead of relying solely on geometric classification
-- Fallback to MediaPipe geometric rules if ML model is unavailable
-- Store gesture timeline in component state for later export
-- **AC**: Hand tracking shows ML model predictions when available, falls back to geometric rules gracefully
-
-#### Step 10.3 — Gesture Data Export for Training
-- Add `POST /api/ml/training-data` endpoint to save detected gesture samples (landmarks + label)
-- Export button in meeting page: "Export session gesture data as JSON"
-- **AC**: Can download all gestures from a meeting session as JSON file with timestamps, landmarks, and labels
-
-#### Step 10.4 — Real-time Caption Translation from ML Model
-- ML model predictions get appended to the live captions (same pipeline as speech-to-text)
-- Distinguish between speech captions and gesture captions visually in CaptionsOverlay
-- Persist ML-detected gestures to the `Message` table as system messages for transcript
-- **AC**: Captions show both spoken words and ML-detected signs with visual distinction
-
-#### Step 10.5 — Model Loading from Backend
-- Serve ML model files (`.onnx`, `.tflite`, or `.json`) from Express static route
-- Frontend loads model dynamically: `fetch('/api/model/sign-classifier.onnx')`
-- Add loading indicator while model initializes
-- **AC**: Model loads from server, not hardcoded client-side path; shows loading state during init
-
----
-
-### PHASE 11 — Missing Core Features
-> Features that are noticeably lacking for a usable product.
-
-#### Step 11.1 — Media Permission Handling
-- When `getUserMedia` fails due to denied permissions, show a modal with instructions
-- Provide "Open browser settings" guidance for Chrome/Firefox/Safari
-- Pre-join screen should request mic and camera separately; let user proceed with mic-only if camera denied
-- **AC**: Denied permissions shows clear error modal, app doesn't silently fail
-
-#### Step 11.2 — Real Transcript (Speech + Gesture History)
-- Currently the "Transcript" tab just shows chat messages
-- Save speech-to-text final transcripts to a new `transcript_entries` table (meetingId, type, content, speaker, timestamp)
-- Types: 'speech' (from Web Speech API), 'gesture' (from MediaPipe/ML model)
-- Transcript tab pulls from this table
-- **AC**: Transcript tab shows all spoken words and detected gestures in chronological order
-
-#### Step 11.3 — Dashboard Settings: Real Device Selection
-- Dashboard settings tab shows hardcoded text "Default - System Audio"
-- Integrate `useMediaDevices` hook into dashboard settings
-- Let users test mic (show audio level meter) and preview camera
-- **AC**: Settings tab lists real devices, shows audio meter, previews camera feed
-
-#### Step 11.4 — End Meeting for All (Host)
-- Add "End Meeting for Everyone" option in the leave modal (only for meeting host)
-- Server emits `meeting-ended` event; all participants get kicked to the "meeting ended" screen
-- **AC**: Host can end meeting for all; guests see "Host ended the meeting" screen
-
-#### Step 11.5 — Screen Share State Sync
-- Screen sharing currently replaces video track locally but doesn't broadcast to others
-- Emit `state-change: { isScreenSharing: true }` via socket
-- Other participants see "User is presenting" indicator on that participant's tile
-- **AC**: When someone shares screen, others see an indicator
-
-#### Step 11.6 — Connection Recovery Badge
-- When socket is reconnecting, show a "Reconnecting..." badge in the top bar
-- Use the existing `isSocketConnected` state
-- **AC**: User sees visual indicator when connection drops and recovers
-
----
-
-### PHASE 12 — Pre-Launch (100 users ready)
-#### Step 10.1 — Set up Neon connection pooling
-- Use Supavisor or PgBouncer
-- Configure `DATABASE_URL` to point to the pooler, connection_limit to a reasonable number
-- **AC**: Can handle 50+ simultaneous DB connections without errors
-
-#### Step 10.2 — Set up monitoring
-- Install `@sentry/node` and `@sentry/react`
-- Capture errors in Sentry dashboard
-- **AC**: Error shows in Sentry dashboard after triggering
-
-#### Step 10.3 — Set up basic analytics
-- Install `posthog-js`
-- Track: page views, meeting created, meeting joined, meeting duration
-- **AC**: PostHog dashboard shows event data
-
-#### Step 10.4 — Load test
-- Use `artillery` or `k6` to load test:
-  - Auth endpoint: 50 req/s for 30 seconds
-  - WebSocket: 50 concurrent connections
-- **AC**: 95% of requests succeed in <500ms, no crashes
-
-#### Step 10.5 — Final deploy checklist
-- [ ] `npm run typecheck` passes
-- [ ] `npm run lint` passes
-- [ ] DB backup created
-- [ ] `.env` has all production secrets
-- [ ] Health check monitoring active
-- [ ] Sentry connected
-- [ ] Error boundary in place
-- [ ] Load test completed
-- **AC**: Deployed app handles 10 concurrent users without issues
-
----
-
-## Quick Reference for AI Handoff
-
-When continuing in a new session (Claude, Cursor, other AI), paste:
-
-```
-Continue from Phase X, Step X.Y in /ROADMAP.md
-
-Before starting:
-1. Read ROADMAP.md to understand the full plan
-2. Run `npx tsc --noEmit` to verify current state
-3. Run `npm run dev` to verify the app boots
-4. Read the specific files mentioned in the current step
-5. Follow the step's acceptance criteria
-6. After completing, mark the step as DONE in ROADMAP.md
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.png$).*)'],
+};
 ```
 
+#### 1.5 — Auth Forms
+
+```typescript
+// src/features/auth/components/SignInForm.tsx
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { signIn } from '@/features/auth/auth.client';
+import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
+
+export function SignInForm() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    const result = await signIn.email({ email, password });
+
+    if (result.error) {
+      setError(result.error.message ?? 'Invalid email or password.');
+      setLoading(false);
+      return;
+    }
+
+    router.push('/dashboard');
+    router.refresh();
+  }
+
+  return (
+    <div className="w-full max-w-sm mx-auto space-y-6">
+      <div className="text-center space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+        <p className="text-sm text-muted-foreground">Enter your email and password to continue.</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email" type="email" placeholder="you@example.com"
+            value={email} onChange={e => setEmail(e.target.value)}
+            required autoComplete="email"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password" type="password" placeholder="••••••••"
+            value={password} onChange={e => setPassword(e.target.value)}
+            required autoComplete="current-password"
+          />
+        </div>
+
+        {error && <p className="text-destructive text-sm">{error}</p>}
+
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+          Sign in
+        </Button>
+      </form>
+
+      <p className="text-center text-sm text-muted-foreground">
+        Don&apos;t have an account?{' '}
+        <Link href="/sign-up" className="text-foreground underline underline-offset-4 hover:text-primary">
+          Sign up
+        </Link>
+      </p>
+    </div>
+  );
+}
+```
+
+```typescript
+// src/features/auth/components/SignUpForm.tsx
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { signUp } from '@/features/auth/auth.client';
+import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
+
+export function SignUpForm() {
+  const router = useRouter();
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm(prev => ({ ...prev, [k]: e.target.value }));
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    const result = await signUp.email({
+      email: form.email,
+      password: form.password,
+      name: form.name,
+    });
+
+    if (result.error) {
+      setError(result.error.message ?? 'Could not create account.');
+      setLoading(false);
+      return;
+    }
+
+    router.push('/dashboard');
+    router.refresh();
+  }
+
+  return (
+    <div className="w-full max-w-sm mx-auto space-y-6">
+      <div className="text-center space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
+        <p className="text-sm text-muted-foreground">Start using Samjho for free.</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="name">Name</Label>
+          <Input id="name" placeholder="Your name" value={form.name} onChange={set('name')} required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" type="email" placeholder="you@example.com" value={form.email} onChange={set('email')} required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <Input id="password" type="password" placeholder="Min 8 characters" value={form.password} onChange={set('password')} required minLength={8} />
+        </div>
+
+        {error && <p className="text-destructive text-sm">{error}</p>}
+
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+          Create account
+        </Button>
+      </form>
+
+      <p className="text-center text-sm text-muted-foreground">
+        Already have an account?{' '}
+        <Link href="/sign-in" className="text-foreground underline underline-offset-4 hover:text-primary">
+          Sign in
+        </Link>
+      </p>
+    </div>
+  );
+}
+```
+
+```typescript
+// src/features/auth/components/UserMenu.tsx
+// Replaces Clerk's <UserButton /> — self-contained, no external dependency
+'use client';
+
+import { signOut, useSession } from '@/features/auth/auth.client';
+import { useRouter } from 'next/navigation';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/shared/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback } from '@/shared/components/ui/avatar';
+import { LogOut, User } from 'lucide-react';
+
+export function UserMenu() {
+  const { data: session } = useSession();
+  const router = useRouter();
+  const name = session?.user?.name ?? 'User';
+  const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+
+  async function handleSignOut() {
+    await signOut();
+    router.push('/');
+    router.refresh();
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="rounded-full outline-none ring-2 ring-transparent focus-visible:ring-primary transition-all">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-primary/15 text-primary text-xs font-semibold">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuLabel className="font-normal">
+          <p className="text-sm font-medium">{name}</p>
+          <p className="text-xs text-muted-foreground truncate">{session?.user?.email}</p>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="gap-2 cursor-pointer">
+          <User className="h-4 w-4" /> Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+          onClick={handleSignOut}>
+          <LogOut className="h-4 w-4" /> Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+```
+
+#### 1.6 — Meetings: Types → Repository → Service → Actions
+
+```typescript
+// src/features/meetings/meetings.types.ts
+// I — Interface Segregation: small focused types only
+
+export interface Meeting {
+  _id: string;
+  roomId: string;
+  title: string;
+  organizerId: string;
+  status: 'scheduled' | 'active' | 'ended';
+  startTime: Date;
+  endTime: Date | null;
+  participantCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateMeetingInput {
+  title?: string;
+  organizerId: string;
+}
+
+export interface AccessibilityPreferences {
+  captionsEnabled: boolean;
+  captionsSize: 'sm' | 'md' | 'lg';
+  captionsPosition: 'top' | 'bottom';
+  gestureDisplayEnabled: boolean;
+  highContrast: boolean;
+  preferredLanguage: string;
+}
+
+// D — Dependency Inversion: depend on this interface, not the implementation
+export interface IMeetingRepository {
+  create(input: CreateMeetingInput): Promise<Pick<Meeting, 'roomId'>>;
+  findByRoomId(roomId: string): Promise<Meeting | null>;
+  findUpcomingByUser(userId: string): Promise<Meeting[]>;
+  findPastByUser(userId: string): Promise<Meeting[]>;
+  markActive(roomId: string): Promise<void>;
+  markEnded(roomId: string, organizerId: string): Promise<void>;
+}
+
+export interface IMeetingService {
+  createMeeting(title: string | undefined, userId: string): Promise<{ roomId: string }>;
+  validateAndJoin(roomId: string): Promise<{ roomId: string; title: string }>;
+  getUpcoming(userId: string): Promise<Meeting[]>;
+  getPast(userId: string): Promise<Meeting[]>;
+  endMeeting(roomId: string, userId: string): Promise<void>;
+}
+```
+
+```typescript
+// src/features/meetings/meetings.repository.ts
+// S — Single Responsibility: only data access
+
+import { getDb } from '@/shared/db/client';
+import type { IMeetingRepository, Meeting, CreateMeetingInput } from './meetings.types';
+
+function generateRoomId(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const seg = () => Array.from({ length: 4 }, () =>
+    chars[Math.floor(Math.random() * chars.length)]).join('');
+  return `${seg()}-${seg()}-${seg()}`; // e.g. "xk2m-r9jq-4lpw"
+}
+
+function formatTitle(title?: string): string {
+  if (title?.trim()) return title.trim();
+  return `Meeting · ${new Date().toLocaleString('en', {
+    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  })}`;
+}
+
+// L — Liskov: this class fully satisfies IMeetingRepository
+export class MongoMeetingRepository implements IMeetingRepository {
+  private async col() {
+    return (await getDb()).collection('meetings');
+  }
+
+  async create(input: CreateMeetingInput): Promise<Pick<Meeting, 'roomId'>> {
+    const col = await this.col();
+    const roomId = generateRoomId();
+    await col.insertOne({
+      roomId,
+      title: formatTitle(input.title),
+      organizerId: input.organizerId,
+      status: 'scheduled',
+      startTime: new Date(),
+      endTime: null,
+      participantCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    return { roomId };
+  }
+
+  async findByRoomId(roomId: string): Promise<Meeting | null> {
+    const col = await this.col();
+    const doc = await col.findOne({ roomId });
+    if (!doc) return null;
+    return { ...doc, _id: doc._id.toString() } as Meeting;
+  }
+
+  async findUpcomingByUser(userId: string): Promise<Meeting[]> {
+    const col = await this.col();
+    const docs = await col
+      .find({ organizerId: userId, status: { $in: ['scheduled', 'active'] } })
+      .sort({ startTime: -1 }).limit(20).toArray();
+    return docs.map(d => ({ ...d, _id: d._id.toString() })) as Meeting[];
+  }
+
+  async findPastByUser(userId: string): Promise<Meeting[]> {
+    const col = await this.col();
+    const docs = await col
+      .find({ organizerId: userId, status: 'ended' })
+      .sort({ endTime: -1 }).limit(50).toArray();
+    return docs.map(d => ({ ...d, _id: d._id.toString() })) as Meeting[];
+  }
+
+  async markActive(roomId: string): Promise<void> {
+    const col = await this.col();
+    await col.updateOne(
+      { roomId },
+      { $set: { status: 'active', updatedAt: new Date() } }
+    );
+  }
+
+  async markEnded(roomId: string, organizerId: string): Promise<void> {
+    const col = await this.col();
+    await col.updateOne(
+      { roomId, organizerId },
+      { $set: { status: 'ended', endTime: new Date(), updatedAt: new Date() } }
+    );
+  }
+}
+```
+
+```typescript
+// src/features/meetings/meetings.service.ts
+// S — Single Responsibility: only business logic
+// D — Dependency Inversion: receives IMeetingRepository, not the concrete class
+
+import type { IMeetingRepository, IMeetingService, Meeting } from './meetings.types';
+
+export class MeetingService implements IMeetingService {
+  constructor(private readonly repo: IMeetingRepository) {}
+
+  async createMeeting(title: string | undefined, userId: string) {
+    return this.repo.create({ title, organizerId: userId });
+  }
+
+  async validateAndJoin(roomId: string) {
+    const meeting = await this.repo.findByRoomId(roomId);
+    if (!meeting || meeting.status === 'ended') {
+      throw new Error('Meeting not found or already ended.');
+    }
+    if (meeting.status === 'scheduled') {
+      await this.repo.markActive(roomId);
+    }
+    return { roomId: meeting.roomId, title: meeting.title };
+  }
+
+  async getUpcoming(userId: string): Promise<Meeting[]> {
+    return this.repo.findUpcomingByUser(userId);
+  }
+
+  async getPast(userId: string): Promise<Meeting[]> {
+    return this.repo.findPastByUser(userId);
+  }
+
+  async endMeeting(roomId: string, userId: string): Promise<void> {
+    const meeting = await this.repo.findByRoomId(roomId);
+    if (!meeting) throw new Error('Meeting not found.');
+    if (meeting.organizerId !== userId) throw new Error('Only the host can end the meeting.');
+    await this.repo.markEnded(roomId, userId);
+  }
+}
+```
+
+```typescript
+// src/features/meetings/meetings.actions.ts
+// Thin server actions — authenticate, then delegate to service
+// O — Open/Closed: adding new meeting features means adding new actions, not editing this file
+
+'use server';
+
+import { requireSession } from '@/features/auth/session';
+import { MongoMeetingRepository } from './meetings.repository';
+import { MeetingService } from './meetings.service';
+
+// Compose once per invocation (Next.js caches db connections via singleton)
+function makeService() {
+  return new MeetingService(new MongoMeetingRepository());
+}
+
+export async function createMeeting(title?: string) {
+  const session = await requireSession();
+  return makeService().createMeeting(title, session.user.id);
+}
+
+export async function validateAndJoinMeeting(roomId: string) {
+  await requireSession(); // Must be signed in to join
+  return makeService().validateAndJoin(roomId);
+}
+
+export async function getUpcomingMeetings() {
+  const session = await requireSession();
+  return makeService().getUpcoming(session.user.id);
+}
+
+export async function getPastMeetings() {
+  const session = await requireSession();
+  return makeService().getPast(session.user.id);
+}
+
+export async function endMeeting(roomId: string) {
+  const session = await requireSession();
+  return makeService().endMeeting(roomId, session.user.id);
+}
+```
+
+**Sprint 1 Deliverable:** Sign up, sign in, sign out all work via Better Auth. Dashboard reads real meetings from Neon Postgres (via Prisma). "New Meeting" creates and redirects. Protected routes redirect to sign-in. Zero Clerk dependency.
+
 ---
 
-## Current Status
+### Sprint 2 (Weeks 3–4): Captions Feature Module
 
-| Area | Status | Notes |
-|------|--------|-------|
-| Auth (register/login/logout/refresh) | ✅ Working | End-to-end functional, rate limiting applied |
-| Dashboard (API-backed meetings) | ✅ Working | Create, list, schedule, calendar, loading states |
-| Socket.io (join room, chat, signaling) | ✅ Working | Auth middleware, room management, reconnect handler exists |
-| WebRTC (peer connections) | Working (basic) | STUN only, no TURN, 2-party untested |
-| Hand tracking (MediaPipe) | ✅ Wired into UI | Shows gesture text in MeetingPage |
-| Speech-to-text (Web Speech API) | ✅ Wired into UI | CaptionsOverlay shows transcript |
-| Speaking detection (Audio Analyser) | Working | Fixed RAF memory leak ✅ |
-| Device selection (enumerateDevices) | ✅ Working | Real device dropdowns in dashboard settings |
-| Rate limiting | ✅ Done | 5 req/60s on login/register/forgot, 10/5min on reset-password |
-| Socket reconnection | ✅ Done | `rejoin-room` on reconnect, `join-room` only on first connect via `initialConnect` flag |
-| Meeting auto-complete | ✅ Done | Last person leaving marks meeting COMPLETED |
-| Memory leak fixes | ✅ Done | RAF loop, cleanup on leave |
-| Error boundary | ✅ Done | Wraps all of App |
-| Toasts | ✅ Done | Sonner for mute/cam/AI/reconnect/join |
-| Loading states | ⚠️ Partially done | Dashboard spinner exists, meeting page loading states needed |
-| TypeScript build | ✅ Clean | `npx tsc --noEmit` zero errors |
-| TURN servers | ⚠️ Wired | Env vars ready, user must deploy/configure a TURN server |
-| WebRTC ICE restart | ✅ Done | `pc.restartIce()` on `failed` state, 3s timeout before teardown |
-| Socket rate limit | ✅ Done | 10 conn/min per IP enforced on socket connect |
-| Express body limit | ✅ Done | `express.json({ limit: '10mb' })` + urlencoded limit |
-| CSP headers | ✅ Done | Production CSP enabled, dev relaxed |
-| Graceful shutdown | ✅ Done | SIGTERM drains Socket.IO → closes Prisma → exits |
-| Global error handler | ✅ Done | Catches unhandled Express errors with 500 JSON response |
-| End meeting for all | ✅ Done | Host can end for everyone via `meeting-ended` socket event |
-| Screen share state sync | ✅ Done | `presenting-change` + `isPresenting` state broadcasts to all |
-| Max meeting size | ✅ Done | 8 user cap enforced via `join-room` check + `meeting-full` event |
-| Connection recovery badge | ✅ Done | Top bar shows connected/reconnecting status |
-| Vite port conflict | ✅ Fixed | Vite runs on 5173, proxies to Express on 3000 |
-| Password enforcement | ✅ Done | 8+ chars, lowercase, uppercase, number — enforced backend + UI checklist |
-| Email in dev | ✅ Fixed | Verification/reset links logged to server console |
-| ML model integration | Not started | Phase 10 — no backend endpoints exist |
-| Real transcript tab | Missing | Phase 11 — just shows chat currently |
+```bash
+npx shadcn@latest add sheet scroll-area separator
+```
 
-**Last updated: 2026-04-07** — Auth system fully fixed: Prisma schema synced (OTP→token fields), email verification with clickable links, password reset with rate limiting, avatar picker in settings, real device dropdowns in dashboard. `npx tsc --noEmit` passes clean. All endpoints tested via curl (register, login, forgot, reset, profile update, email verify). Phase 5 (rate limiting): complete on all 4 auth endpoints. Phase 10 (ML) and Phase 11 (end meeting for all, real transcript tab) remain.
+#### Captions Types → Repository → Service → Action → Component
+
+```typescript
+// src/features/captions/captions.types.ts
+
+export interface CaptionPacket {
+  id: string;
+  userId: string;
+  userName: string;
+  type: 'speech' | 'gesture';
+  content: string;
+  gestureType?: string;
+  language: string;
+  confidence: number;
+  timestamp: number;
+}
+
+export interface TranscriptSegment {
+  timestamp: number;
+  type: 'speech' | 'gesture';
+  content: string;
+  userId: string;
+  userName: string;
+  language: string;
+  confidence: number;
+  gestureType?: string;
+}
+
+export interface Transcript {
+  _id: string;
+  meetingId: string;
+  segments: TranscriptSegment[];
+  createdAt: Date;
+}
+
+export interface ICaptionRepository {
+  appendSegment(roomId: string, segment: TranscriptSegment): Promise<void>;
+  findByRoomId(roomId: string): Promise<Transcript | null>;
+}
+```
+
+```typescript
+// src/features/captions/captions.repository.ts
+
+import { getDb } from '@/shared/db/client';
+import type { ICaptionRepository, Transcript, TranscriptSegment } from './captions.types';
+
+export class MongoCaptionRepository implements ICaptionRepository {
+  private async meetingsCol() {
+    return (await getDb()).collection('meetings');
+  }
+  private async transcriptsCol() {
+    return (await getDb()).collection('transcripts');
+  }
+
+  async appendSegment(roomId: string, segment: TranscriptSegment): Promise<void> {
+    const meetings = await this.meetingsCol();
+    const meeting = await meetings.findOne({ roomId });
+    if (!meeting) return;
+
+    const transcripts = await this.transcriptsCol();
+    await transcripts.updateOne(
+      { meetingId: meeting._id.toString() },
+      {
+        $push: { segments: segment } as any,
+        $setOnInsert: { meetingId: meeting._id.toString(), createdAt: new Date() },
+      },
+      { upsert: true }
+    );
+  }
+
+  async findByRoomId(roomId: string): Promise<Transcript | null> {
+    const meetings = await this.meetingsCol();
+    const meeting = await meetings.findOne({ roomId });
+    if (!meeting) return null;
+
+    const transcripts = await this.transcriptsCol();
+    const doc = await transcripts.findOne({ meetingId: meeting._id.toString() });
+    if (!doc) return null;
+    return { ...doc, _id: doc._id.toString() } as Transcript;
+  }
+}
+```
+
+```typescript
+// src/features/captions/captions.actions.ts
+'use server';
+
+import { requireSession } from '@/features/auth/session';
+import { MongoCaptionRepository } from './captions.repository';
+import type { TranscriptSegment } from './captions.types';
+
+export async function saveCaptionSegment(roomId: string, segment: TranscriptSegment) {
+  await requireSession();
+  const repo = new MongoCaptionRepository();
+  await repo.appendSegment(roomId, segment);
+}
+
+export async function getTranscript(roomId: string) {
+  await requireSession();
+  const repo = new MongoCaptionRepository();
+  return repo.findByRoomId(roomId);
+}
+```
+
+```typescript
+// src/shared/lib/livekit.ts
+// S — Single Responsibility: LiveKit broadcast utilities only
+
+import { DataPacket_Kind } from 'livekit-client';
+import type { CaptionPacket } from '@/features/captions/captions.types';
+
+export async function broadcastCaption(room: any, caption: CaptionPacket): Promise<void> {
+  if (!room?.localParticipant) return;
+  const payload = new TextEncoder().encode(JSON.stringify(caption));
+  await room.localParticipant.publishData(payload, DataPacket_Kind.LOSSY);
+}
+
+export function parseCaptionPacket(raw: Uint8Array): CaptionPacket | null {
+  try { return JSON.parse(new TextDecoder().decode(raw)); }
+  catch { return null; }
+}
+```
+
+```typescript
+// src/shared/hooks/useSpeechToText.ts
+'use client';
+
+import { useCallback, useRef } from 'react';
+import { useRoom } from '@livekit/components-react';
+import { broadcastCaption } from '@/shared/lib/livekit';
+import { saveCaptionSegment } from '@/features/captions/captions.actions';
+import type { CaptionPacket } from '@/features/captions/captions.types';
+
+export function useSpeechToText(roomId: string, userName: string, userId: string) {
+  const room = useRoom();
+  const ref = useRef<SpeechRecognition | null>(null);
+
+  const start = useCallback(() => {
+    const SR = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+
+    const recognition: SpeechRecognition = new SR();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = async (event: SpeechRecognitionEvent) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (!event.results[i].isFinal) continue;
+        const text = event.results[i][0].transcript.trim();
+        if (!text) continue;
+
+        const caption: CaptionPacket = {
+          id: crypto.randomUUID(), userId, userName,
+          type: 'speech', content: text, language: 'en-US',
+          confidence: event.results[i][0].confidence,
+          timestamp: Date.now(),
+        };
+
+        await broadcastCaption(room, caption);
+
+        // Non-blocking persist — don't await, don't block UI
+        saveCaptionSegment(roomId, {
+          timestamp: caption.timestamp, type: 'speech', content: text,
+          userId, userName, language: 'en-US', confidence: caption.confidence,
+        });
+      }
+    };
+
+    recognition.onerror = (e) => {
+      if (e.error === 'no-speech' || e.error === 'audio-capture') recognition.start();
+    };
+
+    recognition.start();
+    ref.current = recognition;
+  }, [room, roomId, userId, userName]);
+
+  const stop = useCallback(() => {
+    ref.current?.stop();
+    ref.current = null;
+  }, []);
+
+  return { start, stop };
+}
+```
+
+```typescript
+// src/features/captions/components/RealtimeCaptions.tsx
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useDataMessage } from '@livekit/components-react';
+import { parseCaptionPacket } from '@/shared/lib/livekit';
+import type { CaptionPacket } from '../captions.types';
+import { cn } from '@/shared/lib/utils';
+
+const sizeClass = { sm: 'text-xs', md: 'text-sm', lg: 'text-base' } as const;
+
+interface Props {
+  enabled?: boolean;
+  size?: 'sm' | 'md' | 'lg';
+  position?: 'top' | 'bottom';
+}
+
+type LiveCaption = CaptionPacket & { expireAt: number };
+
+export function RealtimeCaptions({ enabled = true, size = 'md', position = 'bottom' }: Props) {
+  const [captions, setCaptions] = useState<LiveCaption[]>([]);
+
+  useDataMessage((msg) => {
+    if (!enabled) return;
+    const caption = parseCaptionPacket(msg.payload);
+    if (!caption) return;
+    setCaptions(prev => [{ ...caption, expireAt: Date.now() + 5000 }, ...prev].slice(0, 5));
+  });
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setCaptions(prev => prev.filter(c => Date.now() < c.expireAt));
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  if (!enabled || captions.length === 0) return null;
+
+  return (
+    <div className={cn(
+      'absolute left-4 right-4 z-20 space-y-1.5 pointer-events-none',
+      position === 'bottom' ? 'bottom-20' : 'top-16'
+    )}>
+      {captions.map(c => (
+        <div
+          key={c.id}
+          className="max-w-xl mx-auto rounded-lg bg-black/85 backdrop-blur-sm border border-white/10 px-4 py-2"
+        >
+          <p className="text-xs text-muted-foreground mb-0.5">{c.userName}</p>
+          <p className={cn('text-white font-medium', sizeClass[size])}>{c.content}</p>
+          {c.gestureType && (
+            <p className="text-xs text-primary mt-0.5">🤟 {c.gestureType}</p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+**Sprint 2 Deliverable:** Open two tabs in the same room. Speak in one — captions appear in the other within ~500ms. Transcripts saved to Postgres.
 
 ---
 
-## Environment Variables
+### Sprint 3 (Weeks 5–6): Room Feature Module
 
-### Local Development (`.env`)
-```
-NODE_ENV=development
-PORT=3000
-APP_ORIGIN=http://localhost:3000
-DATABASE_URL=postgresql://...  (Neon or local Postgres)
-JWT_SECRET=<64-char-hex>
-JWT_EXPIRES_IN=15m
-JWT_REFRESH_SECRET=<64-char-hex-different>
-JWT_REFRESH_EXPIRES_IN=7d
-VITE_API_URL=http://localhost:3000
-# Phase 4: TURN support
-# TURN_URL=turn:your-turn-server:3478
-# TURN_USER=your-turn-username
-# TURN_PASS=your-turn-password
+```bash
+npx shadcn@latest add switch select alert-dialog dropdown-menu tooltip
 ```
 
-### Production (Render Environment)
-Same as above plus:
+#### Room Service (token generation)
+
+```typescript
+// src/features/room/room.service.ts
+// S — Single Responsibility: only LiveKit token + room utilities
+
+import { AccessToken } from 'livekit-server-sdk';
+
+export function generateLiveKitToken(roomId: string, userId: string, userName: string): string {
+  const token = new AccessToken(
+    process.env.LIVEKIT_API_KEY!,
+    process.env.LIVEKIT_API_SECRET!,
+    { identity: userId, name: userName, ttl: '2h' }
+  );
+  token.addGrant({ room: roomId, roomJoin: true, canPublish: true, canSubscribe: true });
+  return token.toJwt();
+}
 ```
-NODE_ENV=production
-APP_ORIGIN=your-cf-pages-domain.com
-DATABASE_URL=  (Neon connection string with sslmode=require)
-SENTRY_DSN=  (Phase 10)
-POSTHOG_KEY= (Phase 10)
+
+#### Meeting Room Page
+
+```typescript
+// src/app/(app)/meeting/[roomId]/page.tsx
+
+import { redirect } from 'next/navigation';
+import { getSession } from '@/features/auth/session';
+import { validateAndJoinMeeting } from '@/features/meetings/meetings.actions';
+import { generateLiveKitToken } from '@/features/room/room.service';
+import { MeetingRoom } from '@/features/room/components/MeetingRoom';
+
+export default async function MeetingPage({ params }: { params: { roomId: string } }) {
+  const session = await getSession();
+  if (!session) redirect('/sign-in');
+
+  let meeting;
+  try {
+    meeting = await validateAndJoinMeeting(params.roomId);
+  } catch {
+    redirect('/dashboard?error=meeting-not-found');
+  }
+
+  // Token generated server-side — secret never reaches the browser
+  const token = generateLiveKitToken(
+    params.roomId,
+    session.user.id,
+    session.user.name ?? session.user.email
+  );
+
+  return (
+    <MeetingRoom
+      roomId={params.roomId}
+      title={meeting.title}
+      token={token}
+      livekitUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL!}
+      userId={session.user.id}
+      userName={session.user.name ?? session.user.email}
+    />
+  );
+}
+```
+
+#### Meeting Room Shell
+
+```typescript
+// src/features/room/components/MeetingRoom.tsx
+'use client';
+
+import { useState } from 'react';
+import { LiveKitRoom } from '@livekit/components-react';
+import '@livekit/components-styles';
+import { VideoGrid } from './VideoGrid';
+import { ControlBar } from './ControlBar';
+import { ParticipantSidebar } from './ParticipantSidebar';
+import { MeetingTopBar } from './MeetingTopBar';
+import { AccessibilitySheet } from './AccessibilitySheet';
+import { RealtimeCaptions } from '@/features/captions/components/RealtimeCaptions';
+import type { AccessibilityPreferences } from '@/features/meetings/meetings.types';
+
+const defaults: AccessibilityPreferences = {
+  captionsEnabled: true, captionsSize: 'md', captionsPosition: 'bottom',
+  gestureDisplayEnabled: true, highContrast: false, preferredLanguage: 'en',
+};
+
+interface Props {
+  roomId: string; title: string; token: string;
+  livekitUrl: string; userId: string; userName: string;
+}
+
+export function MeetingRoom({ roomId, title, token, livekitUrl, userId, userName }: Props) {
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [prefs, setPrefs] = useState<AccessibilityPreferences>(defaults);
+
+  return (
+    <LiveKitRoom
+      token={token} serverUrl={livekitUrl} connect audio video
+      className="h-screen bg-background flex flex-col overflow-hidden"
+    >
+      <MeetingTopBar title={title} onToggleSidebar={() => setShowSidebar(v => !v)} />
+
+      <div className="flex-1 relative flex overflow-hidden">
+        <div className="flex-1 relative">
+          <VideoGrid />
+          <RealtimeCaptions
+            enabled={prefs.captionsEnabled}
+            size={prefs.captionsSize}
+            position={prefs.captionsPosition}
+          />
+        </div>
+        {showSidebar && <ParticipantSidebar />}
+      </div>
+
+      <ControlBar
+        roomId={roomId} userId={userId}
+        onSettingsOpen={() => setShowSettings(true)}
+      />
+
+      <AccessibilitySheet
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        prefs={prefs}
+        onChange={setPrefs}
+      />
+    </LiveKitRoom>
+  );
+}
+```
+
+#### Control Bar
+
+```typescript
+// src/features/room/components/ControlBar.tsx
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useLocalParticipant, useRoomContext } from '@livekit/components-react';
+import { Button } from '@/shared/components/ui/button';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/shared/components/ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { Mic, MicOff, Video, VideoOff, MonitorUp, Settings, PhoneOff } from 'lucide-react';
+import { cn } from '@/shared/lib/utils';
+import { endMeeting } from '@/features/meetings/meetings.actions';
+
+interface Props { roomId: string; userId: string; onSettingsOpen: () => void; }
+
+export function ControlBar({ roomId, onSettingsOpen }: Props) {
+  const router = useRouter();
+  const room = useRoomContext();
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+  const [isSharing, setIsSharing] = useState(false);
+  const [ending, setEnding] = useState(false);
+
+  const handleEnd = async () => {
+    setEnding(true);
+    await room?.disconnect();
+    await endMeeting(roomId);
+    router.push(`/meeting/${roomId}/summary`);
+  };
+
+  return (
+    <TooltipProvider delayDuration={300}>
+      <div className="h-20 border-t border-border bg-card flex items-center justify-center gap-3 px-6 shrink-0">
+
+        <Btn label={isMicrophoneEnabled ? 'Mute' : 'Unmute'} danger={!isMicrophoneEnabled}
+          onClick={() => localParticipant?.setMicrophoneEnabled(!isMicrophoneEnabled)}>
+          {isMicrophoneEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+        </Btn>
+
+        <Btn label={isCameraEnabled ? 'Stop camera' : 'Start camera'} danger={!isCameraEnabled}
+          onClick={() => localParticipant?.setCameraEnabled(!isCameraEnabled)}>
+          {isCameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+        </Btn>
+
+        <Btn
+          label={isSharing ? 'Stop sharing' : 'Share screen'} accent={isSharing}
+          onClick={async () => {
+            try { await localParticipant?.setScreenShareEnabled(!isSharing); setIsSharing(v => !v); }
+            catch {} // user cancelled — silent fail
+          }}>
+          <MonitorUp className="h-5 w-5" />
+        </Btn>
+
+        <div className="h-8 w-px bg-border" />
+
+        <Btn label="Accessibility settings" onClick={onSettingsOpen}>
+          <Settings className="h-5 w-5" />
+        </Btn>
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button size="icon" variant="destructive"
+              className="h-12 w-12 rounded-full ml-2" aria-label="End call">
+              <PhoneOff className="h-5 w-5" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>End this meeting?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The meeting ends for everyone and a transcript is saved.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Stay</AlertDialogCancel>
+              <AlertDialogAction disabled={ending} onClick={handleEnd}
+                className="bg-destructive hover:bg-destructive/90">
+                {ending ? 'Ending…' : 'End for everyone'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+      </div>
+    </TooltipProvider>
+  );
+}
+
+// Internal sub-component — not exported (no reason for it to be)
+function Btn({ children, label, onClick, danger, accent }: {
+  children: React.ReactNode; label: string; onClick: () => void;
+  danger?: boolean; accent?: boolean;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button size="icon" variant="ghost" onClick={onClick} aria-label={label}
+          className={cn('h-12 w-12 rounded-full',
+            danger && 'bg-destructive/15 text-destructive hover:bg-destructive/25',
+            accent && 'bg-primary/15 text-primary hover:bg-primary/25',
+          )}>
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+```
+
+#### Participant Sidebar
+
+```typescript
+// src/features/room/components/ParticipantSidebar.tsx
+'use client';
+
+import { useParticipants } from '@livekit/components-react';
+import { ScrollArea } from '@/shared/components/ui/scroll-area';
+import { MicOff, VideoOff } from 'lucide-react';
+
+export function ParticipantSidebar() {
+  const participants = useParticipants();
+  return (
+    <div className="w-72 border-l border-border bg-card flex flex-col shrink-0">
+      <div className="px-4 py-3 border-b border-border">
+        <p className="text-sm font-medium">
+          Participants
+          <span className="text-muted-foreground font-normal ml-1.5">({participants.length})</span>
+        </p>
+      </div>
+      <ScrollArea className="flex-1">
+        <div className="p-2 space-y-0.5">
+          {participants.map(p => (
+            <div key={p.identity}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted/30 transition-colors">
+              <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
+                {(p.name ?? p.identity).charAt(0).toUpperCase()}
+              </div>
+              <p className="text-sm truncate flex-1">{p.name ?? p.identity}</p>
+              <div className="flex gap-1 text-muted-foreground">
+                {!p.isMicrophoneEnabled && <MicOff className="h-3.5 w-3.5" />}
+                {!p.isCameraEnabled && <VideoOff className="h-3.5 w-3.5" />}
+              </div>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+```
+
+#### Accessibility Sheet
+
+```typescript
+// src/features/room/components/AccessibilitySheet.tsx
+'use client';
+
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/shared/components/ui/sheet';
+import { Switch } from '@/shared/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Label } from '@/shared/components/ui/label';
+import { Separator } from '@/shared/components/ui/separator';
+import type { AccessibilityPreferences } from '@/features/meetings/meetings.types';
+
+interface Props {
+  open: boolean; onClose: () => void;
+  prefs: AccessibilityPreferences; onChange: (p: AccessibilityPreferences) => void;
+}
+
+export function AccessibilitySheet({ open, onClose, prefs, onChange }: Props) {
+  const set = (key: keyof AccessibilityPreferences) => (val: any) =>
+    onChange({ ...prefs, [key]: val });
+
+  return (
+    <Sheet open={open} onOpenChange={v => !v && onClose()}>
+      <SheetContent className="w-80 bg-card border-border">
+        <SheetHeader>
+          <SheetTitle>Accessibility</SheetTitle>
+          <SheetDescription>Personalise your in-meeting experience.</SheetDescription>
+        </SheetHeader>
+
+        <div className="mt-6 space-y-6">
+          <Section label="Captions">
+            <Row label="Enable live captions">
+              <Switch checked={prefs.captionsEnabled} onCheckedChange={set('captionsEnabled')} />
+            </Row>
+            {prefs.captionsEnabled && (
+              <>
+                <Row label="Size">
+                  <Pick value={prefs.captionsSize} onChange={set('captionsSize')}
+                    options={[['sm','Small'],['md','Medium'],['lg','Large']]} />
+                </Row>
+                <Row label="Position">
+                  <Pick value={prefs.captionsPosition} onChange={set('captionsPosition')}
+                    options={[['top','Top'],['bottom','Bottom']]} />
+                </Row>
+              </>
+            )}
+          </Section>
+
+          <Separator />
+
+          <Section label="Gestures">
+            <Row label="Show gesture recognition">
+              <Switch checked={prefs.gestureDisplayEnabled} onCheckedChange={set('gestureDisplayEnabled')} />
+            </Row>
+          </Section>
+
+          <Separator />
+
+          <Section label="Visual">
+            <Row label="High contrast">
+              <Switch checked={prefs.highContrast} onCheckedChange={set('highContrast')} />
+            </Row>
+          </Section>
+
+          <Separator />
+
+          <Section label="Language">
+            <Row label="Speech language">
+              <Pick value={prefs.preferredLanguage} onChange={set('preferredLanguage')}
+                options={[['en','English'],['es','Spanish'],['fr','French'],
+                          ['de','German'],['hi','Hindi'],['ja','Japanese']]} />
+            </Row>
+          </Section>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// Private layout helpers — not exported, not reused elsewhere
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">{label}</p>
+      {children}
+    </div>
+  );
+}
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between">
+      <Label className="text-sm font-normal">{label}</Label>
+      {children}
+    </div>
+  );
+}
+function Pick({ value, onChange, options }: {
+  value: string; onChange: (v: string) => void; options: [string, string][];
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        {options.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+}
+```
+
+**Sprint 3 Deliverable:** Full meeting room — all controls, captions, sidebar, accessibility settings, end-call confirmation, summary page.
+
+---
+
+### Sprint 4 (Weeks 7–8): Hardening
+
+```typescript
+// src/shared/lib/validation.ts
+
+import { z } from 'zod';
+
+export const MeetingTitleSchema = z.string().min(1).max(100).optional();
+
+export const RoomIdSchema = z
+  .string()
+  .min(1)
+  .max(50)
+  .regex(/^[a-z0-9-]+$/, 'Invalid room code format');
+
+// Wrap server actions for safe error handling
+export function validate<T>(schema: z.ZodType<T>, value: unknown): T {
+  const result = schema.safeParse(value);
+  if (!result.success) throw new Error(result.error.errors[0].message);
+  return result.data;
+}
+```
+
+Add validation at the top of every server action:
+
+```typescript
+// In meetings.actions.ts — add these lines at start of each action
+import { validate, RoomIdSchema, MeetingTitleSchema } from '@/shared/lib/validation';
+
+export async function createMeeting(rawTitle?: string) {
+  const title = validate(MeetingTitleSchema, rawTitle);  // ← add this
+  const session = await requireSession();
+  return makeService().createMeeting(title, session.user.id);
+}
+
+export async function validateAndJoinMeeting(rawRoomId: string) {
+  const roomId = validate(RoomIdSchema, rawRoomId);      // ← add this
+  await requireSession();
+  return makeService().validateAndJoin(roomId);
+}
+```
+
+**Sprint 4 Deliverable:** All inputs validated. Security headers on every response. Rate limiting active. No unprotected routes.
+
+---
+
+### Sprint 5 (Weeks 9–10): Testing
+
+```bash
+npm install -D vitest @vitest/coverage-v8 @testing-library/react jsdom
+npm install -D @playwright/test && npx playwright install chromium
+```
+
+**vitest.config.ts:**
+```typescript
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: { alias: { '@': path.resolve(__dirname, './src') } },
+  test: {
+    environment: 'jsdom',
+    coverage: { provider: 'v8', reporter: ['text', 'html'], thresholds: { lines: 80 } },
+  },
+});
+```
+
+**Unit tests — repository and service can be tested in complete isolation:**
+
+```typescript
+// src/features/meetings/__tests__/meetings.service.test.ts
+import { describe, it, expect, vi } from 'vitest';
+import { MeetingService } from '../meetings.service';
+import type { IMeetingRepository } from '../meetings.types';
+
+// This is why Dependency Inversion matters — inject a mock, test in isolation
+const mockRepo: IMeetingRepository = {
+  create: vi.fn().mockResolvedValue({ roomId: 'test-room-id' }),
+  findByRoomId: vi.fn().mockResolvedValue({
+    _id: '1', roomId: 'abc', title: 'Test', organizerId: 'user1',
+    status: 'scheduled', startTime: new Date(), endTime: null,
+    participantCount: 0, createdAt: new Date(), updatedAt: new Date(),
+  }),
+  findUpcomingByUser: vi.fn().mockResolvedValue([]),
+  findPastByUser: vi.fn().mockResolvedValue([]),
+  markActive: vi.fn().mockResolvedValue(undefined),
+  markEnded: vi.fn().mockResolvedValue(undefined),
+};
+
+const service = new MeetingService(mockRepo);
+
+describe('MeetingService', () => {
+  it('creates a meeting and returns a roomId', async () => {
+    const result = await service.createMeeting('Test Meeting', 'user1');
+    expect(result.roomId).toBe('test-room-id');
+    expect(mockRepo.create).toHaveBeenCalledWith({ title: 'Test Meeting', organizerId: 'user1' });
+  });
+
+  it('validateAndJoin marks a scheduled meeting as active', async () => {
+    const result = await service.validateAndJoin('abc');
+    expect(result.roomId).toBe('abc');
+    expect(mockRepo.markActive).toHaveBeenCalledWith('abc');
+  });
+
+  it('validateAndJoin throws for ended meetings', async () => {
+    vi.mocked(mockRepo.findByRoomId).mockResolvedValueOnce({
+      ...await mockRepo.findByRoomId('x'), status: 'ended'
+    } as any);
+    await expect(service.validateAndJoin('abc')).rejects.toThrow('already ended');
+  });
+});
+```
+
+**E2E tests:**
+```typescript
+// e2e/auth-flow.spec.ts
+import { test, expect } from '@playwright/test';
+
+test('sign up, sign in, see dashboard', async ({ page }) => {
+  await page.goto('/sign-up');
+  await page.fill('#name', 'Test User');
+  await page.fill('#email', `test${Date.now()}@example.com`);
+  await page.fill('#password', 'testpassword123');
+  await page.getByRole('button', { name: /create account/i }).click();
+  await page.waitForURL('/dashboard');
+  await expect(page.getByRole('button', { name: /new meeting/i })).toBeVisible();
+});
+
+test('invalid room code shows error', async ({ page }) => {
+  // Sign in first (use a fixture user)
+  await page.goto('/dashboard');
+  await page.getByPlaceholder('Room code').fill('xxxx-xxxx-xxxx');
+  await page.getByRole('button').filter({ has: page.locator('svg') }).click();
+  await expect(page.getByText(/meeting not found/i)).toBeVisible();
+});
 ```
 
 ---
 
-## Testing Script (Manual Checklist)
+### Sprint 6 (Weeks 11–12): Deployment → See Deployment section
 
-Run after each phase:
+### Sprint 7 (Weeks 13–14): QA + Delete `_legacy/`
 
+At Sprint 7 sign-off, delete the `_legacy/` folder entirely:
+```bash
+rm -rf src/_legacy/
+git commit -m "chore: remove legacy code"
 ```
-[ ] npm run dev → boots without errors
-[ ] npx tsc --noEmit → zero errors
-[ ] Register new account → /dashboard loads
-[ ] Create instant meeting → /meeting loads
-[ ] Camera shows in self-view
-[ ] Microphone captures audio (no errors in console)
-[ ] Hand tracking detects gestures (see indicator)
-[ ] Speech-to-text shows captions
-[ ] AI toggle turns features on/off
-[ ] Settings modal shows real device names
-[ ] Device switch works while in call
-[ ] Chat sends/receives messages
-[ ] Logout → login cycle works
+
+### Sprint 8 (Weeks 15–16): Beta → v1.0
+
+---
+
+## 🚀 Deployment — Free Tier Stack
+
+**$0/month for beta**
+
+| Service | Purpose | Free Limit |
+|---------|---------|-----------|
+| **Vercel** | Next.js hosting | 100GB bandwidth/month |
+| **MongoDB Atlas M0** | Database | 512MB |
+| **LiveKit Cloud** | Video | 25 participant-hours/month |
+| **Sentry** | Error tracking | 5,000 errors/month |
+| **GitHub Actions** | CI/CD | 2,000 min/month |
+| **UptimeRobot** | Uptime | Free, 5-min checks |
+
+Better Auth replaces Clerk entirely — **no third-party auth service, no MAU limits, no cost.**
+
+### Setup
+
+```bash
+# 1. Vercel
+npx vercel --prod
+# Or connect GitHub at vercel.com/new for auto-deploys
+
+# 2. Run DB index setup once
+npx tsx src/shared/db/setup.ts
+
+# 3. Sentry
+npx @sentry/wizard@latest -i nextjs
 ```
+
+### Environment Variables
+
+```env
+# App
+NEXT_PUBLIC_APP_URL=https://your-domain.vercel.app
+
+# Better Auth (generate a strong random secret)
+BETTER_AUTH_SECRET=your-very-long-random-secret-min-32-chars
+BETTER_AUTH_URL=https://your-domain.vercel.app
+
+# Database (Neon Postgres)
+DATABASE_URL=postgresql://user:password@host/db?sslmode=require
+
+# LiveKit
+LIVEKIT_API_KEY=...
+LIVEKIT_API_SECRET=...
+NEXT_PUBLIC_LIVEKIT_URL=wss://your-project.livekit.cloud
+
+# Sentry (Sprint 6)
+NEXT_PUBLIC_SENTRY_DSN=https://...
+SENTRY_AUTH_TOKEN=...
+```
+
+### GitHub Actions CI/CD
+
+```yaml
+# .github/workflows/ci.yml
+name: CI / Deploy
+
+on:
+  push:    { branches: [main] }
+  pull_request: { branches: [main] }
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run --coverage
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI_TEST }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          BETTER_AUTH_URL: ${{ secrets.BETTER_AUTH_URL_TEST }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+          NEXT_PUBLIC_LIVEKIT_URL: ${{ secrets.NEXT_PUBLIC_LIVEKIT_URL }}
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+```
+
+---
+
+## ✅ Pre-Launch Checklist
+
+**Package Hygiene**
+- [ ] `@clerk/nextjs` absent from `package.json`
+- [ ] `prisma` and `@prisma/client` absent from `package.json`
+- [ ] `svix` absent from `package.json`
+- [ ] `grep -r "@clerk" src/` returns zero results (outside `_legacy/`)
+- [ ] `grep -r "@prisma" src/` returns zero results (outside `_legacy/`)
+
+**Auth (Better Auth)**
+- [ ] Sign up creates a user in `db.users`
+- [ ] Sign in sets a session cookie
+- [ ] Sign out clears the session
+- [ ] `/dashboard` without session redirects to `/sign-in`
+- [ ] `/meeting/*` without session redirects to `/sign-in`
+- [ ] Already signed-in user on `/sign-in` redirects to `/dashboard`
+
+**Meetings**
+- [ ] "New Meeting" creates a record in `db.meetings` and redirects
+- [ ] "Join with code" rejects invalid codes with a clear error
+- [ ] Dashboard reads real upcoming and past meetings
+- [ ] End meeting sets `status: ended` and `endTime`
+
+**Captions**
+- [ ] Speak in Tab A → captions visible in Tab B within 500ms
+- [ ] Captions saved to `db.transcripts`
+- [ ] Summary page shows transcript in order
+- [ ] Download .txt button produces correct file
+
+**Meeting Room**
+- [ ] Mute/unmute — button state matches mic state
+- [ ] Camera on/off — button state matches camera state
+- [ ] Screen share starts and stops cleanly
+- [ ] Participant sidebar shows live updates as users join/leave
+- [ ] Accessibility settings apply immediately (no reload)
+- [ ] End call shows confirmation dialog before disconnecting
+
+**SOLID / Architecture**
+- [ ] No component imports from `@/features/*/repository` directly
+- [ ] No component touches `getDb()` directly
+- [ ] No cross-feature imports (features only import from `shared/`)
+- [ ] `_legacy/` deleted at Sprint 7
+
+**Security**
+- [ ] LiveKit token generated in a server component — never in `'use client'` code
+- [ ] `curl -I <prod-url>` shows `X-Frame-Options: DENY`
+- [ ] Rate limiting returns 429 when triggered
+- [ ] All inputs validated with Zod before reaching service layer
+
+**Tests**
+- [ ] `npx vitest run --coverage` — lines ≥ 80%
+- [ ] `npx playwright test` — all pass
+- [ ] `npm run build` — zero errors
+
+---
+
+## 📊 Key Metrics
+
+| Metric | Target | Tool |
+|--------|--------|------|
+| Dashboard load | <2s | Vercel Analytics |
+| Meeting join | <3s | Manual |
+| Caption latency | <500ms | Two-device test |
+| Uptime | 99.9% | UptimeRobot |
+| Error rate | <0.1% | Sentry |
+| Unit coverage | >80% | vitest |
+| WCAG | AA | Axe DevTools |
+
+---
+
+> **Landing page: never touched.**  
+> **Clerk: removed in Sprint 0, replaced by Better Auth which is self-hosted on your own MongoDB.**  
+> **Prisma: removed in Sprint 0.**  
+> **`_legacy/`: deleted at Sprint 7 sign-off.**  
+> **SOLID: enforced by folder boundaries and the repository → service → action → component chain.**

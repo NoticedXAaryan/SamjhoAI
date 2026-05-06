@@ -8,6 +8,7 @@ export function useMediaDevices() {
 
   const enumerate = useCallback(async () => {
     try {
+      if (!navigator.mediaDevices) return;
       const devices = await navigator.mediaDevices.enumerateDevices();
       setAudioDevices(devices.filter((d) => d.kind === 'audioinput'));
       setVideoDevices(devices.filter((d) => d.kind === 'videoinput'));
@@ -17,6 +18,7 @@ export function useMediaDevices() {
   }, []);
 
   useEffect(() => {
+    if (!navigator.mediaDevices) return;
     navigator.mediaDevices.addEventListener('devicechange', enumerate);
     enumerate();
     return () => {

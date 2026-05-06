@@ -1,6 +1,6 @@
 <div align="center">
 
-<h1>🤟 Samjho</h1>
+<h1>🤟 Samjho AI</h1>
 
 <p><strong>Accessible Video Conferencing — Built for Everyone</strong></p>
 
@@ -8,8 +8,7 @@
 
 <br/>
 
-[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](./LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black.svg)](https://nextjs.org)
 [![React](https://img.shields.io/badge/React-19-blue.svg)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue.svg)](https://typescriptlang.org)
 
@@ -17,60 +16,75 @@
 
 ---
 
-> ⚠️ **Proprietary Software — All Rights Reserved**
-> Any use, modification, or distribution requires **written approval** from the author.
-> 📧 [Noticedxaaryan@gmail.com](mailto:Noticedxaaryan@gmail.com) · See [LICENSE](./LICENSE)
-
----
-
-## What is Samjho?
+## What is Samjho AI?
 
 **Samjho** is an accessible, real-time video conferencing platform designed to break down communication barriers for the deaf, hard-of-hearing, and multilingual communities.
 
+Our goal is to build a highly usable, real-world ready system that makes communication seamless across different abilities.
+
 | Feature | Description |
 |---|---|
-| 🤟 **Sign Language Recognition** | Computer vision detects and interprets hand gestures and ASL/ISL signs from your webcam in real time |
+| 🤟 **Sign Language Recognition** | Computer vision detects and interprets hand gestures and signs from your webcam |
 | 🌐 **Live Translation** | Speech and sign-language input are translated on-the-fly between participants |
 | 📝 **Live Transcription** | Every word spoken or signed is transcribed into captions with a full session transcript |
-| 🎥 **HD Video Meetings** | Host, schedule, and join meetings with mic, camera, screen share, hand raise, and multi-layout grid |
-| 📅 **Dashboard & Scheduler** | Schedule upcoming meetings, generate shareable links, and view meeting history |
-| 🔐 **Secure Auth** | JWT-based authentication with access + refresh tokens |
+| 🎥 **HD Video Meetings** | Host, schedule, and join meetings with mic, camera, screen share, and grid layouts |
+| 🔐 **Modern Auth** | Secure, out-of-the-box user management |
 
 ---
 
-## Tech Stack
+## 🏗️ The Tech Stack (Current Direction)
 
-| Layer | Technology |
-|---|---|
-| **Frontend** | React 19, TypeScript, Tailwind CSS v4, Framer Motion, GSAP |
-| **Backend** | Node.js, Express, Socket.io |
-| **Database** | PostgreSQL (Neon or Render) via Prisma ORM |
-| **Real-time** | Socket.io WebSocket signaling + WebRTC peer video |
-| **Auth** | JWT (access + refresh tokens), bcrypt |
-| **Build** | Vite 6, tsx |
+We are currently migrating from a custom Express/Socket.io backend to a modern, unified Next.js stack to make development easier, deployment seamless, and to create a production-ready application.
+
+| Layer | Technology | Why we use it |
+|---|---|---|
+| **Framework** | Next.js 15 (App Router) | Unified frontend and backend API, easy deployment, React Server Components. |
+| **Authentication** | Clerk | Production-ready, secure user management out-of-the-box. Replaces custom JWT logic. |
+| **Video Engine** | LiveKit | Replaces raw WebRTC. Handles robust multi-party video, screen sharing, and real-time data broadcasting effortlessly. |
+| **Styling** | Tailwind CSS v4, Motion | Beautiful, responsive, accessible UI components. |
+| **Database** | Prisma + Neon Postgres | Serverless Postgres database, interacted with via Next.js Server Actions. |
+| **AI / Accessibility**| MediaPipe & Web Speech | Client-side computer vision for gesture detection and speech-to-text. |
 
 ---
 
-## Project Structure
+## 🚀 Current State & Next Steps
 
-```
-samjho/
-├── src/
-│   ├── backend/               # Express API + Socket.io
-│   │   ├── config/env.ts      # Environment validation (Zod)
-│   │   ├── lib/               # Prisma client, JWT helpers
-│   │   ├── middleware/        # Auth middleware
-│   │   ├── routes/            # auth.ts, meetings.ts
-│   │   └── socket/            # Real-time handlers + WebRTC signaling
-│   ├── components/            # Reusable UI components
-│   ├── lib/                   # Frontend utilities + API client
-│   ├── pages/                 # Landing, Auth, Dashboard, Meeting
-│   └── store/                 # Zustand global state
-├── schema.prisma              # Database schema (User, Meeting, Participant, Message)
-├── server.ts                  # Dev server (Vite + Express unified)
-├── render.yaml                # Render.com deployment config (Blueprint)
-└── .env.example               # Environment variables template
-```
+The project is currently transitioning to its new unified Next.js architecture.
+
+### Immediate Focus Areas (To make it Real-World Ready):
+1. **Solidify Authentication:** Fully integrate Clerk for sign-up, sign-in, and protecting dashboard routes.
+2. **Robust Video Conferencing:** Implement LiveKit to enable reliable video calls, fixing issues with screen sharing and connection drops that existed in the old raw WebRTC implementation.
+3. **Real-time Captions:** Move MediaPipe to a Web Worker to keep the UI smooth, and use LiveKit's Data Channels to broadcast speech and sign language captions instantly to all participants.
+4. **Meeting Management:** Connect Prisma inside Next.js Server Actions to handle creating, joining, and saving meeting history.
+
+For a detailed, step-by-step breakdown of how we are getting there, see the [ROADMAP.md](./ROADMAP.md).
+
+---
+
+## 📚 Comprehensive Documentation
+
+### Production Readiness Status: **35% → Target 95%**
+
+We've completed a full audit of the codebase and created a detailed roadmap to production readiness.
+
+| Document | Purpose |
+|----------|---------|
+| **[`ROADMAP.md`](./ROADMAP.md)** | 12–16 week sprint-by-sprint plan with 8 sprints to reach 95% production readiness |
+| **[`IMPROVEMENTS.md`](./IMPROVEMENTS.md)** | Comprehensive audit results, all identified improvements, detailed technical implementation code, and architecture decisions |
+| **[`PROJECT_BRIEF.md`](./PROJECT_BRIEF.md)** | Original project vision, goals, and problem statement |
+
+### Quick Navigation
+
+**Just getting started?**  
+→ Read [`ROADMAP.md`](./ROADMAP.md) for the high-level plan and sprint breakdown.
+
+**Ready to implement?**  
+→ Read [`IMPROVEMENTS.md`](./IMPROVEMENTS.md) for detailed technical specs, code samples, and architecture decisions.
+
+**Key Findings from the Audit:**
+- ✅ **Strengths:** Solid auth foundation (Clerk), video infrastructure (LiveKit), modern stack (Next.js 15, TypeScript)
+- ❌ **Critical Issues:** Captions detected locally but never broadcast to other participants (defeats core value), meetings not persistent, video controls missing, dual database causing confusion
+- 🎯 **Fixes:** Database consolidation → Real-time caption broadcasting → Video controls → Backend hardening → Testing & deployment
 
 ---
 
@@ -78,113 +92,49 @@ samjho/
 
 ### Prerequisites
 - Node.js 20+
-- A PostgreSQL database (e.g. [Neon](https://neon.tech) or [Render PostgreSQL](https://render.com/docs/databases))
+- A PostgreSQL database (e.g. [Neon](https://neon.tech))
+- A [Clerk](https://clerk.com) account (for Auth)
+- A [LiveKit](https://livekit.io) cloud project (for Video)
 
-### 1. Clone
-
+### 1. Clone & Install
 ```bash
 git clone https://github.com/NoticedXAaryan/SamjhoAI.git
 cd SamjhoAI
-```
-
-### 2. Install dependencies
-
-```bash
 npm install
 ```
 
-### 3. Configure environment
-
+### 2. Configure Environment
+Create a `.env.local` file based on `.env.example`:
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-Edit `.env` with your values:
-
+Add your keys:
 ```env
-DATABASE_URL=postgresql://user:pass@host:5432/dbname?sslmode=require
-JWT_SECRET=<64-char random string>
-JWT_REFRESH_SECRET=<64-char random string>
+# Clerk Auth
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+CLERK_WEBHOOK_SECRET=whsec_...
+
+# Database (Neon Postgres)
+DATABASE_URL=postgresql://user:password@host/db?sslmode=require
+
+# LiveKit
+LIVEKIT_API_KEY=...
+LIVEKIT_API_SECRET=...
+NEXT_PUBLIC_LIVEKIT_URL=wss://...
 ```
 
-> **Generate secrets:** `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
+> Note: if your browser is connecting from a custom host IP during development, ensure `172.17.16.1` is added to `allowedDevOrigins` in `next.config.ts`.
 
-### 4. Sync the database
-
+### 3. Sync Database & Start
 ```bash
 npx prisma db push
-```
-
-### 5. Start
-
-```bash
 npm run dev
 ```
-
-Open **[http://localhost:5173](http://localhost:5173)** (Vite dev server)
-
----
-
-## Deployment
-
-The entire app (frontend + backend) deploys as a **single service** — Render.com or [Railway](https://railway.app) both work.
-
-### Railway (Recommended)
-
-1. Push this repo to GitHub
-2. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
-3. Select `NoticedXAaryan/SamjhoAI`
-4. Add environment variables (Variables tab):
-   - `NODE_ENV=production`
-   - `DATABASE_URL` — Neon PostgreSQL (pooler URL from [neon.tech](https://neon.tech))
-   - `JWT_SECRET` — `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
-   - `JWT_REFRESH_SECRET` — different key, same command
-   - `EMAIL_RESEND_API_KEY` — from [resend.com](https://resend.com)
-   - `APP_ORIGIN` — your Railway domain (after first deploy)
-   - `VITE_API_URL` — same as `APP_ORIGIN`
-5. Deploy — Railway auto-runs `npm install → postinstall → vite build → npm start`
-
-### Render.com
-
-1. Push this repo to GitHub
-2. Go to [render.com](https://render.com) → **New +** → **Blueprint Instance**
-3. Select this repository — `render.yaml` is auto-detected
-4. Fill in variables and click **Apply**
-
-> **Free tier caveat:** Services spin down after inactivity (~50s cold start). Use [UptimeRobot](https://uptimerobot.com) (free) to ping `https://YOUR-URL/health` every 5 min.
-
----
-
-### Full Production Variables
-
-| Variable | Required | Description |
-|---|---|---|
-| `NODE_ENV` | Yes | `development` or `production` |
-| `PORT` | No | Server port (default: `3000`) |
-| `APP_ORIGIN` | Yes | Frontend URL — used for CORS |
-| `DATABASE_URL` | Yes | PostgreSQL URI (use Neon pooler) |
-| `JWT_SECRET` | Yes | 64 hex chars — access tokens |
-| `JWT_EXPIRES_IN` | No | Access token TTL (default: `15m`) |
-| `JWT_REFRESH_SECRET` | Yes | 64 hex chars — refresh tokens |
-| `JWT_REFRESH_EXPIRES_IN` | No | Refresh token TTL (default: `7d`) |
-| `VITE_API_URL` | Prod only | Backend URL — set to `APP_ORIGIN` |
-| `EMAIL_RESEND_API_KEY` | No | Resend API key for email delivery |
-| `TURN_URL` | No | TURN server for WebRTC (optional) |
-| `TURN_USER` | No | TURN username |
-| `TURN_PASS` | No | TURN password |
-
----
-
-## Available Scripts
-
-| Script | Description |
-|---|---|
-| `npm run dev` | Start unified dev server (Vite + Express) |
-| `npm run build` | Build frontend for production |
-| `npm run start` | Start production server |
-| `npm run prisma:migrate:dev` | Run DB migrations (dev) |
-| `npm run prisma:migrate:deploy` | Run DB migrations (prod) |
-| `npm run prisma:studio` | Open Prisma Studio (DB GUI) |
+Open **[http://localhost:3000](http://localhost:3000)**
 
 ---
 
@@ -195,11 +145,3 @@ The entire app (frontend + backend) deploys as a **single service** — Render.c
 This project is **not open source**. No license is granted to use, copy, modify, distribute, or deploy this software without explicit written permission from the author.
 
 📧 **Permissions & inquiries:** [Noticedxaaryan@gmail.com](mailto:Noticedxaaryan@gmail.com)
-
-Violations will be pursued to the fullest extent of applicable law. See [LICENSE](./LICENSE) for full terms.
-
----
-
-<div align="center">
-<sub>Samjho — Because every voice deserves to be heard.</sub>
-</div>
