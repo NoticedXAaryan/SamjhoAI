@@ -14,11 +14,11 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@better-auth/infra": "^0.2.5",
+    "@clerk/backend": "^3.4.5",
+    "@clerk/nextjs": "^7.3.1",
     "@livekit/components-react": "^2.9.20",
     "@livekit/components-styles": "^1.2.0",
     "@prisma/client": "^5.13.0",
-    "better-auth": "^1.6.9",
     "clsx": "^2.1.1",
     "livekit-client": "^2.18.9",
     "livekit-server-sdk": "^2.15.2",
@@ -29,6 +29,7 @@
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "sonner": "^2.0.7",
+    "svix": "^1.92.2",
     "tailwind-merge": "^3.5.0",
     "zod": "^4.4.3"
   },

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSession } from '@/features/auth/session';
+import { auth } from '@clerk/nextjs/server';
 
 async function getOrCreateUserId(): Promise<string> {
-  const session = await requireSession();
+  const { userId } = await auth();
+  if (!userId) throw new Error('Unauthorized');
   const user = await prisma.user.upsert({
-    where: { authUserId: session.user.id },
+    where: { clerkId: userId },
     update: {},
-    create: { authUserId: session.user.id },
+    create: { clerkId: userId },
     select: { id: true },
   });
   return user.id;

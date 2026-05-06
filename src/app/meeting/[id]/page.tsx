@@ -4,19 +4,19 @@ import '@livekit/components-styles';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { useSession } from '@/features/auth/auth.client';
 import { MeetingRoom as MeetingRoomShell } from '@/features/room/components/MeetingRoom';
+import { useUser } from '@clerk/nextjs';
 
 export default function MeetingPage() {
   const params = useParams();
   const roomName = (params.id as string) || 'room';
-  const { data: session, isPending } = useSession();
+  const { user, isLoaded } = useUser();
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const serverUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
   useEffect(() => {
-    if (isPending || !session?.user) return;
+    if (!isLoaded || !user) return;
     if (!serverUrl) {
       setError('LiveKit server URL is not configured. Check NEXT_PUBLIC_LIVEKIT_URL.');
       return;
@@ -37,7 +37,7 @@ export default function MeetingPage() {
         console.error('Failed to fetch token', e);
       }
     })();
-  }, [session?.user, isPending, roomName, serverUrl]);
+  }, [user, isLoaded, roomName, serverUrl]);
 
   if (error) {
     return (
@@ -72,8 +72,8 @@ export default function MeetingPage() {
       title={roomName}
       token={token}
       serverUrl={serverUrl}
-      userId={session?.user?.id ?? 'unknown'}
-      userName={session?.user?.name ?? session?.user?.email ?? 'User'}
+      userId={user?.id ?? 'unknown'}
+      userName={user?.fullName ?? user?.firstName ?? 'User'}
     />
   );
 }

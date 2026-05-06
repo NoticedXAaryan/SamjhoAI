@@ -2,12 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { UserButton, useUser } from '@clerk/nextjs';
 import { Calendar, Copy, MonitorUp, Plus, Sparkles, Video, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useSession } from '@/features/auth/auth.client';
-import { UserMenu } from '@/features/auth/components/UserMenu';
 
 type Meeting = {
   id: string;
@@ -17,12 +16,12 @@ type Meeting = {
 };
 
 export default function DashboardPage() {
-  const { data: session, isPending } = useSession();
+  const { isLoaded, user } = useUser();
   const [meetingCode, setMeetingCode] = useState('');
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loadingMeetings, setLoadingMeetings] = useState(true);
 
-  const displayName = session?.user?.name || session?.user?.email || 'there';
+  const displayName = user?.firstName || user?.fullName || 'there';
 
   const now = useMemo(() => new Date(), []);
   const upcoming = useMemo(
@@ -31,7 +30,7 @@ export default function DashboardPage() {
   );
 
   useEffect(() => {
-    if (isPending || !session?.user) return;
+    if (!isLoaded || !user) return;
     (async () => {
       try {
         setLoadingMeetings(true);
@@ -46,9 +45,9 @@ export default function DashboardPage() {
         setLoadingMeetings(false);
       }
     })();
-  }, [isPending, session?.user]);
+  }, [isLoaded, user]);
 
-  if (isPending) {
+  if (!isLoaded) {
     return (
       <main className="min-h-screen bg-[#050507] text-white flex items-center justify-center px-4">
         <div className="rounded-3xl border border-white/10 bg-black/60 p-8 text-center shadow-lg shadow-cyan-500/10">
@@ -96,7 +95,7 @@ export default function DashboardPage() {
             <div className="text-sm text-white/60 hidden sm:block">
               {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
             </div>
-            <UserMenu />
+            <UserButton />
           </div>
         </div>
       </header>

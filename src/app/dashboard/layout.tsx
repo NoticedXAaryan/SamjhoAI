@@ -1,11 +1,9 @@
 import { redirect } from 'next/navigation';
-import { getSession } from '@/features/auth/session';
-
-export const dynamic = 'force-dynamic';
+import { auth } from '@clerk/nextjs/server';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession();
-  if (!session) {
+  const { userId } = await auth();
+  if (!userId) {
     redirect('/sign-in');
   }
 

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AccessToken } from 'livekit-server-sdk';
-import { requireSession } from '@/features/auth/session';
+import { currentUser } from '@clerk/nextjs/server';
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await requireSession();
+    const user = await currentUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
     const room = searchParams.get('room');
@@ -20,10 +21,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'LiveKit credentials not configured' }, { status: 500 });
     }
 
-    const participantName = session.user.name ?? session.user.email ?? 'Anonymous User';
+    const participantName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Anonymous User';
 
     const at = new AccessToken(apiKey, apiSecret, {
-      identity: session.user.id,
+      identity: user.id,
       name: participantName,
     });
 

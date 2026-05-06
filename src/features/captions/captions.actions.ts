@@ -1,11 +1,12 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { requireSession } from '@/features/auth/session';
+import { auth } from '@clerk/nextjs/server';
 import type { TranscriptSegment } from './captions.types';
 
 export async function saveCaptionSegment(roomName: string, segment: TranscriptSegment) {
-  await requireSession();
+  const { userId } = await auth();
+  if (!userId) throw new Error('Unauthorized');
 
   const meeting = await prisma.meeting.findUnique({
     where: { roomName },
@@ -22,7 +23,8 @@ export async function saveCaptionSegment(roomName: string, segment: TranscriptSe
 }
 
 export async function getTranscript(roomName: string): Promise<TranscriptSegment[]> {
-  await requireSession();
+  const { userId } = await auth();
+  if (!userId) throw new Error('Unauthorized');
 
   const meeting = await prisma.meeting.findUnique({
     where: { roomName },

@@ -2,7 +2,7 @@
 
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { requireSession } from '@/features/auth/session';
+import { auth } from '@clerk/nextjs/server';
 
 export type CreateMeetingDTO = {
   title: string;
@@ -10,11 +10,12 @@ export type CreateMeetingDTO = {
 };
 
 async function getOrCreateCurrentUser() {
-  const session = await requireSession();
+  const { userId } = await auth();
+  if (!userId) throw new Error('Unauthorized');
   return prisma.user.upsert({
-    where: { authUserId: session.user.id },
+    where: { clerkId: userId },
     update: {},
-    create: { authUserId: session.user.id },
+    create: { clerkId: userId },
   });
 }
 

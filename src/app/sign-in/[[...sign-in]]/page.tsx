@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
-import { SignInForm } from '@/features/auth/components/SignInForm';
+import { SignIn } from '@clerk/nextjs';
 
 export default function SignInPage() {
   return (
@@ -9,7 +9,7 @@ export default function SignInPage() {
         <Sparkles className="h-4 w-4 text-cyan-glow" />
         Samjho AI
       </Link>
-      <SignInForm />
+      <SignIn forceRedirectUrl="/dashboard" fallbackRedirectUrl="/dashboard" />
     </main>
   );
 }

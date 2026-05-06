@@ -1,15 +1,10 @@
-import { toNextJsHandler } from 'better-auth/next-js';
-import { getAuth } from '@/features/auth/auth.server';
+import { NextResponse } from 'next/server';
 
-export async function GET(request: Request) {
-  const auth = await getAuth();
-  const { GET } = toNextJsHandler(auth);
-  return GET(request);
+export async function GET() {
+  return NextResponse.json({ error: 'Better Auth disabled (using Clerk).' }, { status: 404 });
 }
 
-export async function POST(request: Request) {
-  const auth = await getAuth();
-  const { POST } = toNextJsHandler(auth);
-  return POST(request);
+export async function POST() {
+  return NextResponse.json({ error: 'Better Auth disabled (using Clerk).' }, { status: 404 });
 }
 
