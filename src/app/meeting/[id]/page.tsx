@@ -30,11 +30,9 @@ export default function MeetingPage() {
           setToken(data.token);
         } else {
           setError(data.error || 'No token returned from LiveKit token API.');
-          console.error('No token returned:', data.error);
         }
-      } catch (e) {
+      } catch {
         setError('Failed to fetch LiveKit token.');
-        console.error('Failed to fetch token', e);
       }
     })();
   }, [user, isLoaded, roomName, serverUrl]);

@@ -4,13 +4,16 @@ import { DownloadTranscriptButton } from './transcript.client';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SummaryPage({ params }: { params: { id: string } }) {
-  const roomName = params.id;
+export default async function SummaryPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: roomName } = await params;
   const segments = await getTranscript(roomName);
 
   const text = segments
     .map((s) => {
-      const t = new Date(s.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const t = new Date(s.timestamp).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
       return `${t}  ${s.userName}: ${s.content}`;
     })
     .join('\n');
@@ -43,14 +46,23 @@ export default async function SummaryPage({ params }: { params: { id: string } }
               <p className="text-sm text-white/60">No transcript saved yet.</p>
             ) : (
               segments.map((s, idx) => (
-                <div key={`${s.timestamp}-${idx}`} className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3">
+                <div
+                  key={`${s.timestamp}-${idx}`}
+                  className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3"
+                >
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-medium truncate">{s.userName}</p>
                     <p className="text-xs text-white/50 shrink-0">
-                      {new Date(s.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(s.timestamp).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </p>
                   </div>
                   <p className="mt-1 text-sm text-white/80 whitespace-pre-wrap">{s.content}</p>
+                  {s.gestureType && (
+                    <p className="text-xs text-cyan-400 mt-1">🤟 {s.gestureType}</p>
+                  )}
                 </div>
               ))
             )}
@@ -60,4 +72,3 @@ export default async function SummaryPage({ params }: { params: { id: string } }
     </main>
   );
 }
-

@@ -29,7 +29,9 @@ export function useSpeechToText(roomName: string, userId: string, userName: stri
 
   const start = useCallback(() => {
     const w = window as any;
-    const SR = (w.SpeechRecognition || w.webkitSpeechRecognition) as SpeechRecognitionConstructor | undefined;
+    const SR = (w.SpeechRecognition || w.webkitSpeechRecognition) as
+      | SpeechRecognitionConstructor
+      | undefined;
     if (!SR) return;
 
     const recognition = new SR();
@@ -49,23 +51,27 @@ export function useSpeechToText(roomName: string, userId: string, userName: stri
           userName,
           type: 'speech',
           content: text,
+          language: 'en-US',
+          confidence: event.results[i][0].confidence ?? 1,
           timestamp: Date.now(),
         };
 
         await broadcastCaption(room, caption);
 
-        // Persist asynchronously; don’t block UI on DB.
+        // Persist asynchronously; don't block UI on DB.
         void saveCaptionSegment(roomName, {
           userId,
           userName,
           content: text,
+          type: 'speech',
+          language: 'en-US',
+          confidence: caption.confidence,
           timestamp: caption.timestamp,
         });
       }
     };
 
     recognition.onerror = () => {
-      // Don’t throw; just stop.
       stop();
     };
 
@@ -78,4 +84,3 @@ export function useSpeechToText(roomName: string, userId: string, userName: stri
 
   return { start, stop, enabled };
 }
-
