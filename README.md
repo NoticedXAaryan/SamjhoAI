@@ -34,30 +34,29 @@ Our goal is to build a highly usable, real-world ready system that makes communi
 
 ## 🏗️ The Tech Stack (Current Direction)
 
-We are currently migrating from a custom Express/Socket.io backend to a modern, unified Next.js stack to make development easier, deployment seamless, and to create a production-ready application.
+Samjho AI is now a unified **Next.js App Router** application with a serverless-friendly architecture for deployment on Vercel.
 
 | Layer | Technology | Why we use it |
 |---|---|---|
-| **Framework** | Next.js 15 (App Router) | Unified frontend and backend API, easy deployment, React Server Components. |
-| **Authentication** | Clerk | Production-ready, secure user management out-of-the-box. Replaces custom JWT logic. |
+| **Framework** | Next.js (App Router) | Unified frontend + backend, edge/serverless deployment, great DX. |
+| **Authentication** | Better Auth | Self-hosted auth (no MAU limits), email/password sessions. |
 | **Video Engine** | LiveKit | Replaces raw WebRTC. Handles robust multi-party video, screen sharing, and real-time data broadcasting effortlessly. |
 | **Styling** | Tailwind CSS v4, Motion | Beautiful, responsive, accessible UI components. |
 | **Database** | Prisma + Neon Postgres | Serverless Postgres database, interacted with via Next.js Server Actions. |
-| **AI / Accessibility**| MediaPipe & Web Speech | Client-side computer vision for gesture detection and speech-to-text. |
+| **Realtime captions** | Web Speech + LiveKit Data | Speech-to-text in browser + broadcast to room + transcript persistence. |
 
 ---
 
 ## 🚀 Current State & Next Steps
 
-The project is currently transitioning to its new unified Next.js architecture.
+### Current State (MVP)
+- **Auth**: Better Auth sign-up/sign-in/sign-out
+- **Meetings**: Create/join meetings, persisted to Postgres (Prisma)
+- **Meeting room**: LiveKit grid + mic/cam/screen share controls + participants sidebar
+- **Realtime captions**: Broadcast via LiveKit data messages + saved transcript
+- **Summary**: `/meeting/[id]/summary` shows transcript and downloads `.txt`
 
-### Immediate Focus Areas (To make it Real-World Ready):
-1. **Solidify Authentication:** Fully integrate Clerk for sign-up, sign-in, and protecting dashboard routes.
-2. **Robust Video Conferencing:** Implement LiveKit to enable reliable video calls, fixing issues with screen sharing and connection drops that existed in the old raw WebRTC implementation.
-3. **Real-time Captions:** Move MediaPipe to a Web Worker to keep the UI smooth, and use LiveKit's Data Channels to broadcast speech and sign language captions instantly to all participants.
-4. **Meeting Management:** Connect Prisma inside Next.js Server Actions to handle creating, joining, and saving meeting history.
-
-For a detailed, step-by-step breakdown of how we are getting there, see the [ROADMAP.md](./ROADMAP.md).
+For the full roadmap, see [`ROADMAP.md`](./ROADMAP.md).
 
 ---
 
@@ -82,7 +81,7 @@ We've completed a full audit of the codebase and created a detailed roadmap to p
 → Read [`IMPROVEMENTS.md`](./IMPROVEMENTS.md) for detailed technical specs, code samples, and architecture decisions.
 
 **Key Findings from the Audit:**
-- ✅ **Strengths:** Solid auth foundation (Clerk), video infrastructure (LiveKit), modern stack (Next.js 15, TypeScript)
+- ✅ **Strengths:** Self-hosted auth (Better Auth), video infrastructure (LiveKit), modern stack (Next.js, TypeScript)
 - ❌ **Critical Issues:** Captions detected locally but never broadcast to other participants (defeats core value), meetings not persistent, video controls missing, dual database causing confusion
 - 🎯 **Fixes:** Database consolidation → Real-time caption broadcasting → Video controls → Backend hardening → Testing & deployment
 
@@ -93,7 +92,7 @@ We've completed a full audit of the codebase and created a detailed roadmap to p
 ### Prerequisites
 - Node.js 20+
 - A PostgreSQL database (e.g. [Neon](https://neon.tech))
-- A [Clerk](https://clerk.com) account (for Auth)
+- A MongoDB database (e.g. MongoDB Atlas) for Better Auth
 - A [LiveKit](https://livekit.io) cloud project (for Video)
 
 ### 1. Clone & Install
@@ -111,12 +110,15 @@ cp .env.example .env.local
 
 Add your keys:
 ```env
-# Clerk Auth
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-CLERK_WEBHOOK_SECRET=whsec_...
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Better Auth
+BETTER_AUTH_SECRET=your-long-random-secret-min-32-chars
+
+# MongoDB (Better Auth)
+MONGODB_URI=mongodb+srv://...
+MONGODB_DB_NAME=samjhoai
 
 # Database (Neon Postgres)
 DATABASE_URL=postgresql://user:password@host/db?sslmode=require
@@ -135,6 +137,19 @@ npx prisma db push
 npm run dev
 ```
 Open **[http://localhost:3000](http://localhost:3000)**
+
+---
+
+## Deploy on Vercel
+
+1. Import the GitHub repo into Vercel (framework auto-detects **Next.js**).
+2. Set these environment variables in Vercel:
+   - `NEXT_PUBLIC_APP_URL` = `https://<your-vercel-domain>`
+   - `BETTER_AUTH_SECRET` = strong random secret (32+ chars)
+   - `MONGODB_URI` and optional `MONGODB_DB_NAME`
+   - `DATABASE_URL` (Neon Postgres)
+   - `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `NEXT_PUBLIC_LIVEKIT_URL`
+3. Deploy.
 
 ---
 
