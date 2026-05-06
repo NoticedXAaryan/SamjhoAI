@@ -21,6 +21,8 @@ model Meeting {
   id          String      @id @default(cuid())
   title       String
   startsAt    DateTime
+  status      String      @default("scheduled")
+  endedAt     DateTime?
   roomName    String      @unique
   createdAt   DateTime    @default(now())
   organizer   User        @relation(fields: [organizerId], references: [id])

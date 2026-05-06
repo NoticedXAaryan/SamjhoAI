@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import type { AccessibilityPreferences } from '@/features/meetings/meetings.types';
+import type { AccessibilityPreferences } from '@/shared/lib/types';
 
 interface Props {
   open: boolean;

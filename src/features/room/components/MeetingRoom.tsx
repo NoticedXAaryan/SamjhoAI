@@ -11,7 +11,7 @@ import { AccessibilitySheet } from './AccessibilitySheet';
 import { RealtimeCaptions } from '@/features/captions/components/RealtimeCaptions';
 import { useSpeechToText } from '@/shared/hooks/useSpeechToText';
 import { Button } from '@/components/ui/button';
-import type { AccessibilityPreferences } from '@/features/meetings/meetings.types';
+import type { AccessibilityPreferences } from '@/shared/lib/types';
 
 const defaults: AccessibilityPreferences = {
   captionsEnabled: true,

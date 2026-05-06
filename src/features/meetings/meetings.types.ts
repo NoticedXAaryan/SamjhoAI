@@ -17,14 +17,8 @@ export interface CreateMeetingInput {
   organizerId: string;
 }
 
-export interface AccessibilityPreferences {
-  captionsEnabled: boolean;
-  captionsSize: 'sm' | 'md' | 'lg';
-  captionsPosition: 'top' | 'bottom';
-  gestureDisplayEnabled: boolean;
-  highContrast: boolean;
-  preferredLanguage: string;
-}
+// Re-export from shared to maintain backward compatibility
+export type { AccessibilityPreferences } from '@/shared/lib/types';
 
 // D — Dependency Inversion: depend on this interface, not the implementation
 export interface IMeetingRepository {

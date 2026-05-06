@@ -24,6 +24,7 @@ export class PrismaMeetingRepository implements IMeetingRepository {
         roomName,
         title: formatTitle(input.title),
         startsAt: new Date(),
+        status: 'scheduled',
         organizerId: input.organizerId,
       },
     });
@@ -33,7 +34,6 @@ export class PrismaMeetingRepository implements IMeetingRepository {
   async findByRoomName(roomName: string): Promise<Meeting | null> {
     const doc = await prisma.meeting.findUnique({
       where: { roomName },
-      include: { organizer: true },
     });
     if (!doc) return null;
     return {
@@ -41,9 +41,9 @@ export class PrismaMeetingRepository implements IMeetingRepository {
       roomName: doc.roomName,
       title: doc.title,
       organizerId: doc.organizerId,
-      status: (doc as any).status ?? 'scheduled',
+      status: (doc.status as Meeting['status']) ?? 'scheduled',
       startsAt: doc.startsAt,
-      endedAt: (doc as any).endedAt ?? null,
+      endedAt: doc.endedAt ?? null,
       createdAt: doc.createdAt,
     };
   }
@@ -52,7 +52,7 @@ export class PrismaMeetingRepository implements IMeetingRepository {
     const docs = await prisma.meeting.findMany({
       where: {
         organizerId: userId,
-        startsAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        status: { not: 'ended' },
       },
       orderBy: { startsAt: 'desc' },
       take: 20,
@@ -62,9 +62,9 @@ export class PrismaMeetingRepository implements IMeetingRepository {
       roomName: d.roomName,
       title: d.title,
       organizerId: d.organizerId,
-      status: 'scheduled' as const,
+      status: (d.status as Meeting['status']) ?? 'scheduled',
       startsAt: d.startsAt,
-      endedAt: null,
+      endedAt: d.endedAt ?? null,
       createdAt: d.createdAt,
     }));
   }
@@ -73,7 +73,7 @@ export class PrismaMeetingRepository implements IMeetingRepository {
     const docs = await prisma.meeting.findMany({
       where: {
         organizerId: userId,
-        startsAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        status: 'ended',
       },
       orderBy: { startsAt: 'desc' },
       take: 50,
@@ -85,25 +85,22 @@ export class PrismaMeetingRepository implements IMeetingRepository {
       organizerId: d.organizerId,
       status: 'ended' as const,
       startsAt: d.startsAt,
-      endedAt: null,
+      endedAt: d.endedAt ?? null,
       createdAt: d.createdAt,
     }));
   }
 
   async markActive(roomName: string): Promise<void> {
-    // With current Prisma schema, startsAt represents activation
     await prisma.meeting.update({
       where: { roomName },
-      data: { startsAt: new Date() },
+      data: { status: 'active', startsAt: new Date() },
     });
   }
 
   async markEnded(roomName: string, _organizerId: string): Promise<void> {
-    // Mark as ended by setting startsAt far in the past
-    // (The schema doesn't have status/endedAt fields yet; this is a safe workaround)
     await prisma.meeting.update({
       where: { roomName },
-      data: { startsAt: new Date(0) },
+      data: { status: 'ended', endedAt: new Date() },
     });
   }
 }
