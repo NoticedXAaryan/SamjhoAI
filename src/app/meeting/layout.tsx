@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
-import { auth } from '@clerk/nextjs/server';
+import { getSession } from '@/lib/auth';
 
 export default async function MeetingLayout({ children }: { children: React.ReactNode }) {
-  const { userId } = await auth();
-  if (!userId) {
+  const session = await getSession();
+  if (!session) {
     redirect('/sign-in');
   }
 

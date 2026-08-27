@@ -4,19 +4,23 @@ import '@livekit/components-styles';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { PreJoin, type LocalUserChoices } from '@livekit/components-react';
 import { MeetingRoom as MeetingRoomShell } from '@/features/room/components/MeetingRoom';
-import { useUser } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 
 export default function MeetingPage() {
   const params = useParams();
   const roomName = (params.id as string) || 'room';
-  const { user, isLoaded } = useUser();
+  const { data: session, isPending } = useSession();
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
+  const [title, setTitle] = useState(roomName);
+  const [isHost, setIsHost] = useState(false);
+  const [userChoices, setUserChoices] = useState<LocalUserChoices | null>(null);
   const serverUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
   useEffect(() => {
-    if (!isLoaded || !user) return;
+    if (isPending || !session?.user || !userChoices) return;
     if (!serverUrl) {
       setError('LiveKit server URL is not configured. Check NEXT_PUBLIC_LIVEKIT_URL.');
       return;
@@ -24,10 +28,17 @@ export default function MeetingPage() {
 
     (async () => {
       try {
-        const resp = await fetch(`/api/livekit/token?room=${encodeURIComponent(roomName)}`);
+        const resp = await fetch('/api/livekit/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          body: JSON.stringify({ roomName }),
+        });
         const data = await resp.json();
-        if (data.token) {
+        if (resp.ok && data.token) {
           setToken(data.token);
+          setTitle(data.title || roomName);
+          setIsHost(Boolean(data.isHost));
         } else {
           setError(data.error || 'No token returned from LiveKit token API.');
         }
@@ -35,7 +46,20 @@ export default function MeetingPage() {
         setError('Failed to fetch LiveKit token.');
       }
     })();
-  }, [user, isLoaded, roomName, serverUrl]);
+  }, [session, isPending, roomName, serverUrl, userChoices]);
+
+  if (!error && !isPending && session?.user && !userChoices) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#050507] p-4 text-white" data-lk-theme="default">
+        <PreJoin
+          defaults={{ username: session.user.name, audioEnabled: true, videoEnabled: true }}
+          joinLabel="Join meeting"
+          onSubmit={setUserChoices}
+          onError={(preJoinError) => setError(preJoinError.message)}
+        />
+      </main>
+    );
+  }
 
   if (error) {
     return (
@@ -67,11 +91,13 @@ export default function MeetingPage() {
   return (
     <MeetingRoomShell
       roomName={roomName}
-      title={roomName}
+      title={title}
       token={token}
       serverUrl={serverUrl}
-      userId={user?.id ?? 'unknown'}
-      userName={user?.fullName ?? user?.firstName ?? 'User'}
+      userId={session?.user.id ?? 'unknown'}
+      userName={session?.user.name ?? 'User'}
+      isHost={isHost}
+      userChoices={userChoices!}
     />
   );
 }

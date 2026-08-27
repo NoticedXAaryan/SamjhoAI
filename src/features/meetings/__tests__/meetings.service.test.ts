@@ -115,6 +115,12 @@ describe('MeetingService', () => {
       expect(repo.markEnded).toHaveBeenCalledWith('test-room', 'user-1');
     });
 
+    it('allows the organizer to retry ending an already-ended meeting', async () => {
+      vi.mocked(repo.findByRoomName).mockResolvedValueOnce(makeMeeting({ status: 'ended' }));
+      await service.endMeeting('test-room', 'user-1');
+      expect(repo.markEnded).not.toHaveBeenCalled();
+    });
+
     it('throws when meeting not found', async () => {
       vi.mocked(repo.findByRoomName).mockResolvedValueOnce(null);
       await expect(service.endMeeting('missing', 'user-1')).rejects.toThrow(

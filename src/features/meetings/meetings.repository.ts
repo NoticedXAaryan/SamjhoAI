@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma';
 import type { IMeetingRepository, Meeting, CreateMeetingInput } from './meetings.types';
 
 function generateRoomName(): string {
-  return `meeting-${crypto.randomUUID().slice(0, 8)}`;
+  return `meeting-${crypto.randomUUID()}`;
 }
 
 function formatTitle(title?: string): string {
@@ -97,10 +97,11 @@ export class PrismaMeetingRepository implements IMeetingRepository {
     });
   }
 
-  async markEnded(roomName: string, _organizerId: string): Promise<void> {
-    await prisma.meeting.update({
-      where: { roomName },
+  async markEnded(roomName: string, organizerId: string): Promise<void> {
+    const result = await prisma.meeting.updateMany({
+      where: { roomName, organizerId, status: { not: 'ended' } },
       data: { status: 'ended', endedAt: new Date() },
     });
+    if (result.count !== 1) throw new Error('Meeting could not be ended.');
   }
 }

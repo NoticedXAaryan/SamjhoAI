@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 import { Calendar } from 'lucide-react';
 import { DashboardHeader } from '@/features/meetings/components/DashboardHeader';
 import { HeroCard } from '@/features/meetings/components/HeroCard';
@@ -12,13 +12,13 @@ import { getUpcomingMeetings, getPastMeetings } from '@/features/meetings/meetin
 import type { Meeting } from '@/features/meetings/meetings.types';
 
 export default function DashboardPage() {
-  const { isLoaded, user } = useUser();
+  const { data: session, isPending } = useSession();
   const [upcoming, setUpcoming] = useState<Meeting[]>([]);
   const [past, setPast] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isLoaded || !user) return;
+    if (isPending || !session?.user) return;
     (async () => {
       try {
         setLoading(true);
@@ -31,9 +31,9 @@ export default function DashboardPage() {
         setLoading(false);
       }
     })();
-  }, [isLoaded, user]);
+  }, [isPending, session]);
 
-  if (!isLoaded) {
+  if (isPending) {
     return (
       <main className="min-h-screen bg-[#050507] text-white flex items-center justify-center px-4">
         <div className="rounded-3xl border border-white/10 bg-black/60 p-8 text-center shadow-lg shadow-cyan-500/10">

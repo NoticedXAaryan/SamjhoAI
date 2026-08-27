@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 import { Video, Plus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -10,12 +10,12 @@ import { Input } from '@/components/ui/input';
 import { createMeeting } from '../meetings.actions';
 
 export function HeroCard() {
-  const { user } = useUser();
+  const { data: session } = useSession();
   const router = useRouter();
   const [meetingCode, setMeetingCode] = useState('');
   const [creating, setCreating] = useState(false);
 
-  const displayName = user?.firstName || user?.fullName || 'there';
+  const displayName = session?.user.name?.split(' ')[0] || 'there';
 
   async function handleNewMeeting() {
     try {

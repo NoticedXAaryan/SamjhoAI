@@ -8,24 +8,78 @@ datasource db {
 }
 
 model User {
-  id         String    @id @default(cuid())
-  clerkId    String    @unique
-  email      String?   @unique
-  firstName  String?
-  lastName   String?
-  createdAt  DateTime  @default(now())
-  meetings   Meeting[]
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  meetings      Meeting[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  issuer                String
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([issuer, accountId], map: "account_issuer_accountId_uidx")
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
 }
 
 model Meeting {
-  id          String      @id @default(cuid())
+  id          String       @id @default(cuid())
   title       String
   startsAt    DateTime
-  status      String      @default("scheduled")
+  status      String       @default("scheduled")
   endedAt     DateTime?
-  roomName    String      @unique
-  createdAt   DateTime    @default(now())
-  organizer   User        @relation(fields: [organizerId], references: [id])
+  roomName    String       @unique
+  createdAt   DateTime     @default(now())
+  organizer   User         @relation(fields: [organizerId], references: [id])
   organizerId String
   transcripts Transcript[]
 }

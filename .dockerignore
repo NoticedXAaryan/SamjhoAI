@@ -1,0 +1,14 @@
+.git
+.github
+.next
+.codebase-memory
+node_modules
+coverage
+*.log
+.env
+.env.*
+!.env.example
+!.env.production.example
+README.md
+ROADMAP.md
+PROJECT_BRIEF.md

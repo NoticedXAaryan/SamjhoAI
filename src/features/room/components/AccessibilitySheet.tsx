@@ -27,7 +27,7 @@ interface Props {
 }
 
 export function AccessibilitySheet({ open, onClose, prefs, onChange }: Props) {
-  const set = (key: keyof AccessibilityPreferences) => (val: any) =>
+  const set = <K extends keyof AccessibilityPreferences>(key: K) => (val: AccessibilityPreferences[K]) =>
     onChange({ ...prefs, [key]: val });
 
   return (
@@ -137,17 +137,17 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function Pick({
+function Pick<T extends string>({
   value,
   onChange,
   options,
 }: {
-  value: string;
-  onChange: (v: string) => void;
-  options: [string, string][];
+  value: T;
+  onChange: (v: T) => void;
+  options: [T, string][];
 }) {
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select value={value} onValueChange={(nextValue) => onChange(nextValue as T)}>
       <SelectTrigger className="w-28 h-8 text-xs">
         <SelectValue />
       </SelectTrigger>

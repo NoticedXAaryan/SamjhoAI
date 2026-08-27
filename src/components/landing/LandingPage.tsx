@@ -4,13 +4,14 @@ import { motion, useScroll, useTransform, AnimatePresence } from 'motion/react';
 import { useRef, useState, memo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useUser } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 import { Sparkles, Zap, Globe, Lock, Video, Shield, Download, Mic, MessageSquare, PhoneOff, Twitter, Linkedin, Github } from 'lucide-react';
 
 const DynamicIslandNav = memo(() => {
   const [isExpanded, setIsExpanded] = useState(false);
   const router = useRouter();
-  const { isSignedIn } = useUser();
+  const { data: session } = useSession();
+  const isSignedIn = Boolean(session);
 
   const handleStartMeeting = () => {
     if (isSignedIn) {
@@ -440,7 +441,8 @@ CVBackground.displayName = 'CVBackground';
 
 export default function LandingPage() {
   const router = useRouter();
-  const { isSignedIn } = useUser();
+  const { data: session } = useSession();
+  const isSignedIn = Boolean(session);
 
   const handleStartMeeting = () => {
     if (isSignedIn) {

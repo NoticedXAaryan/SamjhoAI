@@ -21,6 +21,10 @@ export const CaptionSegmentSchema = z.object({
   gestureType: z.string().optional(),
 });
 
+export const CaptionPacketSchema = CaptionSegmentSchema.extend({
+  id: z.string().uuid(),
+});
+
 /** Validate input with Zod — throws on failure */
 export function validate<T>(schema: z.ZodType<T>, value: unknown): T {
   const result = schema.safeParse(value);

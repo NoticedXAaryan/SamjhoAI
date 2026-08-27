@@ -2,9 +2,9 @@ name: CI / Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
   pull_request:
-    branches: [main]
+    branches: [master, main]
 
 jobs:
   test:
@@ -14,13 +14,16 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
-      - run: npm install --legacy-peer-deps
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Unit tests with coverage
         run: npx vitest run --coverage
@@ -28,11 +31,12 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
-          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
-          NEXT_PUBLIC_LIVEKIT_URL: ${{ secrets.NEXT_PUBLIC_LIVEKIT_URL }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BETTER_AUTH_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
+          BETTER_AUTH_URL: http://localhost:3000
+          LIVEKIT_API_KEY: ci-key
+          LIVEKIT_API_SECRET: ci-only-livekit-secret-0123456789abcdef
+          NEXT_PUBLIC_LIVEKIT_URL: ws://localhost:7880
+          LIVEKIT_URL: http://localhost:7880
+          DATABASE_URL: postgresql://user:password@localhost:5432/samjho
 
 

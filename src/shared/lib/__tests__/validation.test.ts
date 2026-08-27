@@ -91,7 +91,8 @@ describe('CaptionSegmentSchema', () => {
   });
 
   it('rejects missing userId', () => {
-    const { userId, ...rest } = validSegment;
+    const rest: Partial<typeof validSegment> = { ...validSegment };
+    delete rest.userId;
     expect(CaptionSegmentSchema.safeParse(rest).success).toBe(false);
   });
 });

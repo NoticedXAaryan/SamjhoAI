@@ -6,15 +6,31 @@ import { broadcastCaption } from '@/shared/lib/livekit';
 import { saveCaptionSegment } from '@/features/captions/captions.actions';
 import type { CaptionPacket } from '@/features/captions/captions.types';
 
+interface SpeechRecognitionResultEvent {
+  resultIndex: number;
+  results: ArrayLike<{
+    isFinal: boolean;
+    0: { transcript: string; confidence?: number };
+  }>;
+}
+
 type SpeechRecognitionConstructor = new () => {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
-  onresult: ((event: any) => void) | null;
-  onerror: ((event: any) => void) | null;
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
   start: () => void;
   stop: () => void;
 };
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
 
 export function useSpeechToText(roomName: string, userId: string, userName: string) {
   const room = useRoomContext();
@@ -28,10 +44,7 @@ export function useSpeechToText(roomName: string, userId: string, userName: stri
   }, []);
 
   const start = useCallback(() => {
-    const w = window as any;
-    const SR = (w.SpeechRecognition || w.webkitSpeechRecognition) as
-      | SpeechRecognitionConstructor
-      | undefined;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return;
 
     const recognition = new SR();
@@ -39,7 +52,7 @@ export function useSpeechToText(roomName: string, userId: string, userName: stri
     recognition.interimResults = false;
     recognition.lang = 'en-US';
 
-    recognition.onresult = async (event: any) => {
+    recognition.onresult = async (event: SpeechRecognitionResultEvent) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (!event.results[i].isFinal) continue;
         const text = event.results[i][0].transcript.trim();
@@ -74,6 +87,7 @@ export function useSpeechToText(roomName: string, userId: string, userName: stri
     recognition.onerror = () => {
       stop();
     };
+    recognition.onend = () => setEnabled(false);
 
     recognition.start();
     recognitionRef.current = recognition;

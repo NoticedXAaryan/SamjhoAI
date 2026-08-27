@@ -4,7 +4,7 @@ import tsParser from '@typescript-eslint/parser';
 
 export default [
   {
-    ignores: ['.next/**', 'archive/**', 'node_modules/**'],
+    ignores: ['.next/**', 'archive/**', 'coverage/**', 'node_modules/**'],
   },
   nextPlugin.configs.recommended,
   {

@@ -4,23 +4,16 @@
 
 'use server';
 
-import { auth } from '@clerk/nextjs/server';
-import { prisma } from '@/lib/prisma';
+import { getSession } from '@/lib/auth';
 import { validate, MeetingTitleSchema, RoomNameSchema } from '@/shared/lib/validation';
 import { PrismaMeetingRepository } from './meetings.repository';
 import { MeetingService } from './meetings.service';
+import { RoomServiceClient } from 'livekit-server-sdk';
 
 async function requireUserId(): Promise<string> {
-  const { userId } = await auth();
-  if (!userId) throw new Error('Unauthorized');
-  // Upsert user in our DB
-  const user = await prisma.user.upsert({
-    where: { clerkId: userId },
-    update: {},
-    create: { clerkId: userId },
-    select: { id: true },
-  });
-  return user.id;
+  const session = await getSession();
+  if (!session?.user.id) throw new Error('Unauthorized');
+  return session.user.id;
 }
 
 function makeService() {
@@ -52,5 +45,15 @@ export async function getPastMeetings() {
 export async function endMeeting(rawRoomName: string) {
   const roomName = validate(RoomNameSchema, rawRoomName);
   const userId = await requireUserId();
-  return makeService().endMeeting(roomName, userId);
+  await makeService().endMeeting(roomName, userId);
+
+  const serverUrl = process.env.LIVEKIT_URL ?? process.env.NEXT_PUBLIC_LIVEKIT_URL;
+  const apiKey = process.env.LIVEKIT_API_KEY;
+  const apiSecret = process.env.LIVEKIT_API_SECRET;
+  if (!serverUrl || !apiKey || !apiSecret) {
+    throw new Error('LiveKit server credentials are not configured.');
+  }
+
+  const httpUrl = serverUrl.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
+  await new RoomServiceClient(httpUrl, apiKey, apiSecret).deleteRoom(roomName);
 }

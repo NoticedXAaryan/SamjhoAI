@@ -32,7 +32,7 @@ export interface IMeetingRepository {
 
 export interface IMeetingService {
   createMeeting(title: string | undefined, userId: string): Promise<{ roomName: string }>;
-  validateAndJoin(roomName: string): Promise<{ roomName: string; title: string }>;
+  validateAndJoin(roomName: string): Promise<{ roomName: string; title: string; organizerId: string }>;
   getUpcoming(userId: string): Promise<Meeting[]>;
   getPast(userId: string): Promise<Meeting[]>;
   endMeeting(roomName: string, userId: string): Promise<void>;

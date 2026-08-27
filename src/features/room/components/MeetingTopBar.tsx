@@ -3,7 +3,7 @@
 import { useParticipants } from '@livekit/components-react';
 import { Button } from '@/components/ui/button';
 
-export function MeetingTopBar({ title, onToggleSidebar }: { title: string; onToggleSidebar: () => void }) {
+export function MeetingTopBar({ title, onToggleSidebar, onToggleChat }: { title: string; onToggleSidebar: () => void; onToggleChat: () => void }) {
   const participants = useParticipants();
 
   return (
@@ -12,9 +12,10 @@ export function MeetingTopBar({ title, onToggleSidebar }: { title: string; onTog
         <p className="text-sm font-medium truncate">{title}</p>
         <p className="text-xs text-white/50">{participants.length} participant{participants.length === 1 ? '' : 's'}</p>
       </div>
-      <Button variant="secondary" size="sm" onClick={onToggleSidebar}>
-        Participants
-      </Button>
+      <div className="flex gap-2">
+        <Button variant="secondary" size="sm" onClick={onToggleChat}>Chat</Button>
+        <Button variant="secondary" size="sm" onClick={onToggleSidebar}>Participants</Button>
+      </div>
     </div>
   );
 }

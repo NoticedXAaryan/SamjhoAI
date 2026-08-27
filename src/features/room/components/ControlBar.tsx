@@ -21,30 +21,37 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Mic, MicOff, Video, VideoOff, MonitorUp, Settings, PhoneOff } from 'lucide-react';
+import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Settings, PhoneOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { endMeeting } from '@/features/meetings/meetings.actions';
 
 interface Props {
   roomName: string;
-  userId: string;
+  isHost: boolean;
   onSettingsOpen: () => void;
 }
 
-export function ControlBar({ roomName, onSettingsOpen }: Props) {
+export function ControlBar({ roomName, isHost, onSettingsOpen }: Props) {
   const router = useRouter();
   const room = useRoomContext();
-  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
-  const [isSharing, setIsSharing] = useState(false);
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
   const [ending, setEnding] = useState(false);
+  const [mediaError, setMediaError] = useState('');
+
+  const handleLeave = async () => {
+    await room.disconnect();
+    router.push('/dashboard');
+  };
 
   const handleEnd = async () => {
     setEnding(true);
+    setMediaError('');
     try {
-      await room?.disconnect();
-      await endMeeting(roomName).catch(() => {});
-    } finally {
+      await endMeeting(roomName);
       router.push(`/meeting/${encodeURIComponent(roomName)}/summary`);
+    } catch (error) {
+      setMediaError(error instanceof Error ? error.message : 'Could not end the meeting.');
+      setEnding(false);
     }
   };
 
@@ -54,7 +61,10 @@ export function ControlBar({ roomName, onSettingsOpen }: Props) {
         <Btn
           label={isMicrophoneEnabled ? 'Mute' : 'Unmute'}
           danger={!isMicrophoneEnabled}
-          onClick={() => localParticipant?.setMicrophoneEnabled(!isMicrophoneEnabled)}
+          onClick={async () => {
+            try { await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled); }
+            catch { setMediaError('Microphone access failed. Check your browser permissions.'); }
+          }}
         >
           {isMicrophoneEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
         </Btn>
@@ -62,20 +72,22 @@ export function ControlBar({ roomName, onSettingsOpen }: Props) {
         <Btn
           label={isCameraEnabled ? 'Stop camera' : 'Start camera'}
           danger={!isCameraEnabled}
-          onClick={() => localParticipant?.setCameraEnabled(!isCameraEnabled)}
+          onClick={async () => {
+            try { await localParticipant.setCameraEnabled(!isCameraEnabled); }
+            catch { setMediaError('Camera access failed. Check your browser permissions.'); }
+          }}
         >
           {isCameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
         </Btn>
 
         <Btn
-          label={isSharing ? 'Stop sharing' : 'Share screen'}
-          accent={isSharing}
+          label={isScreenShareEnabled ? 'Stop sharing' : 'Share screen'}
+          accent={isScreenShareEnabled}
           onClick={async () => {
             try {
-              await localParticipant?.setScreenShareEnabled(!isSharing);
-              setIsSharing((v) => !v);
+              await localParticipant.setScreenShareEnabled(!isScreenShareEnabled);
             } catch {
-              // user cancelled — silent fail
+              setMediaError('Screen sharing was cancelled or blocked.');
             }
           }}
         >
@@ -88,7 +100,11 @@ export function ControlBar({ roomName, onSettingsOpen }: Props) {
           <Settings className="h-5 w-5" />
         </Btn>
 
-        <AlertDialog>
+        <Btn label="Leave meeting" onClick={handleLeave} danger>
+          <LogOut className="h-5 w-5" />
+        </Btn>
+
+        {isHost && <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button
               size="icon"
@@ -117,7 +133,8 @@ export function ControlBar({ roomName, onSettingsOpen }: Props) {
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
-        </AlertDialog>
+        </AlertDialog>}
+        {mediaError && <p role="alert" className="absolute bottom-20 rounded bg-destructive px-3 py-2 text-sm text-white">{mediaError}</p>}
       </div>
     </TooltipProvider>
   );
@@ -133,7 +150,7 @@ function Btn({
 }: {
   children: React.ReactNode;
   label: string;
-  onClick: () => void;
+  onClick: () => void | Promise<void>;
   danger?: boolean;
   accent?: boolean;
 }) {

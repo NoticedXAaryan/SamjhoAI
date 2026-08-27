@@ -82,7 +82,7 @@ export default function DownloadPage() {
           <CardContent className="grid gap-3 text-sm text-white/70 sm:grid-cols-3">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-              Clerk auth is active
+              Self-hosted authentication is active
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-300" />

@@ -22,7 +22,7 @@ export class MeetingService implements IMeetingService {
     if (meeting.status === 'scheduled') {
       await this.repo.markActive(roomName);
     }
-    return { roomName: meeting.roomName, title: meeting.title };
+    return { roomName: meeting.roomName, title: meeting.title, organizerId: meeting.organizerId };
   }
 
   async getUpcoming(userId: string): Promise<Meeting[]> {
@@ -37,6 +37,7 @@ export class MeetingService implements IMeetingService {
     const meeting = await this.repo.findByRoomName(roomName);
     if (!meeting) throw new Error('Meeting not found.');
     if (meeting.organizerId !== userId) throw new Error('Only the host can end the meeting.');
+    if (meeting.status === 'ended') return;
     await this.repo.markEnded(roomName, userId);
   }
 }

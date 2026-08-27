@@ -4,11 +4,11 @@
 
 <p><strong>Accessible Video Conferencing — Built for Everyone</strong></p>
 
-<p>Real-time sign language recognition · Live AI translation · Meeting transcription</p>
+<p>Self-hosted video meetings · Realtime captions · Chat and transcripts</p>
 
 <br/>
 
-[![Next.js](https://img.shields.io/badge/Next.js-15-black.svg)](https://nextjs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org)
 [![React](https://img.shields.io/badge/React-19-blue.svg)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue.svg)](https://typescriptlang.org)
 
@@ -24,25 +24,25 @@ Our goal is to build a highly usable, real-world ready system that makes communi
 
 | Feature | Description |
 |---|---|
-| 🤟 **Sign Language Recognition** | Computer vision detects and interprets hand gestures and signs from your webcam |
-| 🌐 **Live Translation** | Speech and sign-language input are translated on-the-fly between participants |
-| 📝 **Live Transcription** | Every word spoken or signed is transcribed into captions with a full session transcript |
-| 🎥 **HD Video Meetings** | Host, schedule, and join meetings with mic, camera, screen share, and grid layouts |
-| 🔐 **Modern Auth** | Secure, out-of-the-box user management |
+| 📝 **Live captions** | Browser speech recognition, reliable in-room caption broadcast, and host transcript export |
+| 🎥 **Video meetings** | Prejoin preview, mic, camera, screen share, remote audio, grid layouts, chat, and participant list |
+| 🔐 **Self-hosted auth** | Better Auth email/password accounts and sessions stored in PostgreSQL |
+| 🤟 **Sign recognition** | Planned; the current release does not claim an implemented gesture-recognition model |
+| 🌐 **Translation** | Planned after the reliable meeting baseline is complete |
 
 ---
 
 ## 🏗️ The Tech Stack (Current Direction)
 
-Samjho AI is now a unified **Next.js App Router** application with a serverless-friendly architecture for deployment on Vercel.
+Samjho AI is a unified **Next.js App Router** application designed for a self-hosted Docker/Dokploy deployment.
 
 | Layer | Technology | Why we use it |
 |---|---|---|
-| **Framework** | Next.js (App Router) | Unified frontend + backend, edge/serverless deployment, great DX. |
+| **Framework** | Next.js (App Router) | Unified frontend and backend in one self-hosted container. |
 | **Authentication** | Better Auth | Self-hosted auth (no MAU limits), email/password sessions. |
 | **Video Engine** | LiveKit | Replaces raw WebRTC. Handles robust multi-party video, screen sharing, and real-time data broadcasting effortlessly. |
 | **Styling** | Tailwind CSS v4, Motion | Beautiful, responsive, accessible UI components. |
-| **Database** | Prisma + Neon Postgres | Serverless Postgres database, interacted with via Next.js Server Actions. |
+| **Database** | Prisma + PostgreSQL | One self-hostable database for accounts, meetings, and transcripts. |
 | **Realtime captions** | Web Speech + LiveKit Data | Speech-to-text in browser + broadcast to room + transcript persistence. |
 
 ---
@@ -52,8 +52,8 @@ Samjho AI is now a unified **Next.js App Router** application with a serverless-
 ### Current State (MVP)
 - **Auth**: Better Auth sign-up/sign-in/sign-out
 - **Meetings**: Create/join meetings, persisted to Postgres (Prisma)
-- **Meeting room**: LiveKit grid + mic/cam/screen share controls + participants sidebar
-- **Realtime captions**: Broadcast via LiveKit data messages + saved transcript
+- **Meeting room**: Prejoin device selection, LiveKit grid, remote audio, mic/cam/screen share controls, reconnection state, chat, and participants sidebar
+- **Realtime captions**: Reliable, validated, topic-scoped LiveKit data messages plus transcript persistence
 - **Summary**: `/meeting/[id]/summary` shows transcript and downloads `.txt`
 
 For the full roadmap, see [`ROADMAP.md`](./ROADMAP.md).
@@ -62,44 +62,33 @@ For the full roadmap, see [`ROADMAP.md`](./ROADMAP.md).
 
 ## 📚 Comprehensive Documentation
 
-### Production Readiness Status: **35% → Target 95%**
-
-We've completed a full audit of the codebase and created a detailed roadmap to production readiness.
+The repository is being recovered in phases: deployable self-hosted foundation first, complete meeting reliability second, then advanced accessibility features.
 
 | Document | Purpose |
 |----------|---------|
 | **[`ROADMAP.md`](./ROADMAP.md)** | 12–16 week sprint-by-sprint plan with 8 sprints to reach 95% production readiness |
-| **[`IMPROVEMENTS.md`](./IMPROVEMENTS.md)** | Comprehensive audit results, all identified improvements, detailed technical implementation code, and architecture decisions |
 | **[`PROJECT_BRIEF.md`](./PROJECT_BRIEF.md)** | Original project vision, goals, and problem statement |
+| **[`deploy/SELF_HOSTING.md`](./deploy/SELF_HOSTING.md)** | Dokploy, networking, secrets, health checks, and backup guidance |
 
 ### Quick Navigation
 
 **Just getting started?**  
 → Read [`ROADMAP.md`](./ROADMAP.md) for the high-level plan and sprint breakdown.
 
-**Ready to implement?**  
-→ Read [`IMPROVEMENTS.md`](./IMPROVEMENTS.md) for detailed technical specs, code samples, and architecture decisions.
-
-**Key Findings from the Audit:**
-- ✅ **Strengths:** Self-hosted auth (Better Auth), video infrastructure (LiveKit), modern stack (Next.js, TypeScript)
-- ❌ **Critical Issues:** Captions detected locally but never broadcast to other participants (defeats core value), meetings not persistent, video controls missing, dual database causing confusion
-- 🎯 **Fixes:** Database consolidation → Real-time caption broadcasting → Video controls → Backend hardening → Testing & deployment
-
 ---
 
 ## Local Development
 
 ### Prerequisites
-- Node.js 20+
-- A PostgreSQL database (e.g. [Neon](https://neon.tech))
-- A MongoDB database (e.g. MongoDB Atlas) for Better Auth
-- A [LiveKit](https://livekit.io) cloud project (for Video)
+- Node.js 22+
+- PostgreSQL 15+
+- A self-hosted [LiveKit](https://livekit.io) server (the included Compose stack can run one)
 
 ### 1. Clone & Install
 ```bash
 git clone https://github.com/NoticedXAaryan/SamjhoAI.git
 cd SamjhoAI
-npm install
+npm ci
 ```
 
 ### 2. Configure Environment
@@ -111,45 +100,34 @@ cp .env.example .env.local
 Add your keys:
 ```env
 # App
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-
 # Better Auth
 BETTER_AUTH_SECRET=your-long-random-secret-min-32-chars
+BETTER_AUTH_URL=http://localhost:3000
 
-# MongoDB (Better Auth)
-MONGODB_URI=mongodb+srv://...
-MONGODB_DB_NAME=samjhoai
-
-# Database (Neon Postgres)
-DATABASE_URL=postgresql://user:password@host/db?sslmode=require
+# PostgreSQL
+DATABASE_URL=postgresql://user:password@localhost:5432/samjho
 
 # LiveKit
 LIVEKIT_API_KEY=...
 LIVEKIT_API_SECRET=...
 NEXT_PUBLIC_LIVEKIT_URL=wss://...
+LIVEKIT_URL=https://...
 ```
 
 > Note: if your browser is connecting from a custom host IP during development, ensure `172.17.16.1` is added to `allowedDevOrigins` in `next.config.ts`.
 
 ### 3. Sync Database & Start
 ```bash
-npx prisma db push
+npx prisma migrate deploy
 npm run dev
 ```
 Open **[http://localhost:3000](http://localhost:3000)**
 
 ---
 
-## Deploy on Vercel
+## Deploy on Dokploy
 
-1. Import the GitHub repo into Vercel (framework auto-detects **Next.js**).
-2. Set these environment variables in Vercel:
-   - `NEXT_PUBLIC_APP_URL` = `https://<your-vercel-domain>`
-   - `BETTER_AUTH_SECRET` = strong random secret (32+ chars)
-   - `MONGODB_URI` and optional `MONGODB_DB_NAME`
-   - `DATABASE_URL` (Neon Postgres)
-   - `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `NEXT_PUBLIC_LIVEKIT_URL`
-3. Deploy.
+The repository includes a production `Dockerfile`, health endpoints, Prisma migrations, and `compose.self-hosted.yml` for the application, PostgreSQL, Redis, and LiveKit. See [`deploy/SELF_HOSTING.md`](./deploy/SELF_HOSTING.md) for domains, secrets, ports, backups, and verification.
 
 ---
 

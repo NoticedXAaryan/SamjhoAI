@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRoomContext } from '@livekit/components-react';
 import { RoomEvent, type RemoteParticipant } from 'livekit-client';
-import { parseCaptionPacket } from '@/shared/lib/livekit';
+import { CAPTION_TOPIC, LOCAL_CAPTION_EVENT, parseCaptionPacket } from '@/shared/lib/livekit';
 import { cn } from '@/lib/utils';
 import type { CaptionPacket } from '../captions.types';
 
@@ -24,18 +24,36 @@ export function RealtimeCaptions({ enabled = true, size = 'md', position = 'bott
   useEffect(() => {
     if (!room) return;
 
-    const onData = (payload: Uint8Array, _participant?: RemoteParticipant) => {
-      if (!enabled) return;
-      const caption = parseCaptionPacket(payload);
-      if (!caption) return;
+    const addCaption = (caption: CaptionPacket) => {
       setCaptions((prev) =>
-        [{ ...caption, expireAt: Date.now() + 6_000 }, ...prev].slice(0, 5)
+        [{ ...caption, expireAt: Date.now() + 6_000 }, ...prev.filter((item) => item.id !== caption.id)].slice(0, 5)
       );
     };
 
+    const onData = (payload: Uint8Array, participant?: RemoteParticipant, _kind?: unknown, topic?: string) => {
+      if (!enabled) return;
+      if (topic !== CAPTION_TOPIC || !participant) return;
+      const caption = parseCaptionPacket(payload);
+      if (!caption) return;
+      let userId = participant.identity;
+      try {
+        const metadata = JSON.parse(participant.metadata || '{}') as { userId?: string };
+        if (metadata.userId) userId = metadata.userId;
+      } catch {
+        // Ignore malformed participant metadata and retain the signed identity.
+      }
+      addCaption({ ...caption, userId, userName: participant.name || 'Participant' });
+    };
+
+    const onLocalCaption = (event: Event) => {
+      if (enabled) addCaption((event as CustomEvent<CaptionPacket>).detail);
+    };
+
     room.on(RoomEvent.DataReceived, onData);
+    window.addEventListener(LOCAL_CAPTION_EVENT, onLocalCaption);
     return () => {
       room.off(RoomEvent.DataReceived, onData);
+      window.removeEventListener(LOCAL_CAPTION_EVENT, onLocalCaption);
     };
   }, [enabled, room]);
 

@@ -91,6 +91,7 @@ tmp/
 .dev.vars*
 !.dev.vars.example
 !.env.example
+!.env.self-hosted.example
 
 # Local TS build cache
 tsconfig.tsbuildinfo
@@ -101,3 +102,4 @@ archive/
 # Cursor skills / generated metadata
 skills/
 skills-lock.json
+.codebase-memory/
