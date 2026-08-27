@@ -7,7 +7,7 @@ type BrandLogoProps = {
   priority?: boolean;
 };
 
-const logoSource = '/brand/samjho-ai-logo-ui-gradient.png';
+const logoSource = '/brand/samjho-ai-logo-eclipse-ui.png';
 
 export function BrandLogo({ compact = false, className, priority = false }: BrandLogoProps) {
   if (compact) {
