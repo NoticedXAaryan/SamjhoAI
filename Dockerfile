@@ -1,6 +1,8 @@
 FROM node:22-bookworm-slim AS dependencies
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+RUN apt-get update && apt-get install --yes --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
 RUN npm install --global npm@10.9.8
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
@@ -27,6 +29,8 @@ ENV NODE_ENV=production \
     PORT=3000
 
 RUN groupadd --system --gid 1001 nodejs && useradd --system --uid 1001 --gid nodejs nextjs
+RUN apt-get update && apt-get install --yes --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
 RUN npm install --global npm@10.9.8
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
@@ -34,10 +38,11 @@ RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/next.config.ts ./next.config.ts
+RUN chown -R nextjs:nodejs /app/node_modules /app/prisma
 
 USER nextjs
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && exec npm start"]
