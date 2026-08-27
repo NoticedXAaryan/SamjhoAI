@@ -1,6 +1,7 @@
 FROM node:22-bookworm-slim AS dependencies
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm install --global npm@10.9.8
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm ci
@@ -26,6 +27,7 @@ ENV NODE_ENV=production \
     PORT=3000
 
 RUN groupadd --system --gid 1001 nodejs && useradd --system --uid 1001 --gid nodejs nextjs
+RUN npm install --global npm@10.9.8
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm ci --omit=dev && npm cache clean --force
