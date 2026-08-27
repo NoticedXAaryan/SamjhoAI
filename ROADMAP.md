@@ -1,4 +1,8 @@
-# 🗺️ Samjho AI — Master Roadmap
+# Archived roadmap — historical reference only
+
+> This file describes an earlier Clerk-based recovery plan and is not authoritative for the current application. Do not implement from it. Current behavior and priorities are documented in [`docs/FEATURES.md`](./docs/FEATURES.md), [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md), and [`deploy/SELF_HOSTING.md`](./deploy/SELF_HOSTING.md).
+
+# 🗺️ Samjho AI — Legacy Master Roadmap
 
 <div align="center">
 

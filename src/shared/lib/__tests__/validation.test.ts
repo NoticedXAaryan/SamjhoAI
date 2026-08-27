@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   MeetingTitleSchema,
   RoomNameSchema,
+  GuestDisplayNameSchema,
   CaptionSegmentSchema,
   validate,
 } from '../validation';
@@ -22,6 +23,22 @@ describe('MeetingTitleSchema', () => {
 
   it('rejects title longer than 100 characters', () => {
     expect(MeetingTitleSchema.safeParse('x'.repeat(101)).success).toBe(false);
+  });
+});
+
+describe('GuestDisplayNameSchema', () => {
+  it('trims and accepts a normal display name', () => {
+    expect(GuestDisplayNameSchema.parse('  Guest User  ')).toBe('Guest User');
+  });
+
+  it('rejects HTML-like input and control characters', () => {
+    expect(GuestDisplayNameSchema.safeParse('<script>').success).toBe(false);
+    expect(GuestDisplayNameSchema.safeParse('Guest\nUser').success).toBe(false);
+  });
+
+  it('rejects names outside the allowed length', () => {
+    expect(GuestDisplayNameSchema.safeParse('A').success).toBe(false);
+    expect(GuestDisplayNameSchema.safeParse('x'.repeat(81)).success).toBe(false);
   });
 });
 

@@ -28,10 +28,11 @@ import { endMeeting } from '@/features/meetings/meetings.actions';
 interface Props {
   roomName: string;
   isHost: boolean;
+  returnHref: string;
   onSettingsOpen: () => void;
 }
 
-export function ControlBar({ roomName, isHost, onSettingsOpen }: Props) {
+export function ControlBar({ roomName, isHost, returnHref, onSettingsOpen }: Props) {
   const router = useRouter();
   const room = useRoomContext();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
@@ -40,7 +41,7 @@ export function ControlBar({ roomName, isHost, onSettingsOpen }: Props) {
 
   const handleLeave = async () => {
     await room.disconnect();
-    router.push('/dashboard');
+    router.push(returnHref);
   };
 
   const handleEnd = async () => {

@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AccessToken } from 'livekit-server-sdk';
 import { getSession } from '@/lib/auth';
 import { PrismaMeetingRepository } from '@/features/meetings/meetings.repository';
 import { MeetingService } from '@/features/meetings/meetings.service';
-import { RoomNameSchema } from '@/shared/lib/validation';
+import { GuestDisplayNameSchema, RoomNameSchema } from '@/shared/lib/validation';
+import { createGuestSession, getGuestSession } from '@/features/auth/guest-session';
+import { createLiveKitParticipantToken } from '@/infrastructure/livekit/livekit.gateway';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => null);
     const parsed = RoomNameSchema.safeParse(body?.roomName);
@@ -19,32 +19,42 @@ export async function POST(req: NextRequest) {
     }
     const room = parsed.data;
 
-    const meeting = await new MeetingService(new PrismaMeetingRepository()).validateAndJoin(room);
-    const isHost = meeting.organizerId === session.user.id;
-
-    const apiKey = process.env.LIVEKIT_API_KEY;
-    const apiSecret = process.env.LIVEKIT_API_SECRET;
-
-    if (!apiKey || !apiSecret) {
-      return NextResponse.json({ error: 'LiveKit credentials not configured' }, { status: 500 });
+    const authenticatedUser = session?.user;
+    const parsedGuestName = GuestDisplayNameSchema.safeParse(body?.displayName);
+    if (!authenticatedUser && !parsedGuestName.success) {
+      return NextResponse.json(
+        { error: parsedGuestName.error.issues[0]?.message || 'Enter a valid display name.' },
+        { status: 400 },
+      );
     }
 
-    const participantName = session.user.name || 'Anonymous User';
+    const meeting = await new MeetingService(new PrismaMeetingRepository()).validateAndJoin(room);
+    const existingGuest = authenticatedUser ? null : await getGuestSession(room);
+    const createdGuest = !authenticatedUser && existingGuest?.displayName !== parsedGuestName.data
+      ? createGuestSession(room, parsedGuestName.data!)
+      : null;
+    const guestSession = existingGuest?.displayName === parsedGuestName.data
+      ? existingGuest
+      : createdGuest?.session;
+    const participantId = authenticatedUser?.id || guestSession!.guestId;
+    const participantName = authenticatedUser?.name || guestSession!.displayName;
+    const isHost = Boolean(authenticatedUser && meeting.organizerId === authenticatedUser.id);
 
-    const at = new AccessToken(apiKey, apiSecret, {
-      identity: `${session.user.id}:${crypto.randomUUID()}`,
-      name: participantName,
-      metadata: JSON.stringify({ userId: session.user.id, isHost }),
-      ttl: '10m',
+    const token = await createLiveKitParticipantToken({
+      roomName: room,
+      participantId,
+      participantName,
+      isHost,
+      isGuest: !authenticatedUser,
     });
-
-    at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true });
-
-    const token = await at.toJwt();
-    return NextResponse.json(
-      { token, title: meeting.title, isHost },
+    const response = NextResponse.json(
+      { token, title: meeting.title, isHost, userId: participantId, userName: participantName, isGuest: !authenticatedUser },
       { headers: { 'Cache-Control': 'no-store' } },
     );
+    if (createdGuest) {
+      response.cookies.set(createdGuest.cookie.name, createdGuest.cookie.value, createdGuest.cookie.options);
+    }
+    return response;
   } catch (error) {
     console.error('Failed to generate LiveKit token:', error);
     const message = error instanceof Error ? error.message : 'Unable to join meeting.';

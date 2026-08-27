@@ -80,6 +80,8 @@ export function useSpeechToText(roomName: string, userId: string, userName: stri
           language: 'en-US',
           confidence: caption.confidence,
           timestamp: caption.timestamp,
+        }).catch(() => {
+          // Realtime captions should continue even if transcript storage is temporarily unavailable.
         });
       }
     };

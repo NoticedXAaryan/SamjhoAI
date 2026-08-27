@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { isProtectedPath } from '@/shared/lib/route-access';
 
-const protectedPrefixes = ['/dashboard', '/meeting'];
 const authPrefixes = ['/sign-in', '/sign-up'];
 const rl = new Map<string, { count: number; resetAt: number }>();
 const MAX_RATE_LIMIT_KEYS = 10_000;
@@ -53,7 +53,7 @@ export default async function proxy(request: NextRequest) {
     return addSecurityHeaders(response);
   }
 
-  const isProtected = protectedPrefixes.some((prefix) => pathname.startsWith(prefix));
+  const isProtected = isProtectedPath(pathname);
   const isAuthPage = authPrefixes.some((prefix) => pathname.startsWith(prefix));
   if (isProtected || isAuthPage) {
     const session = await auth.api.getSession({ headers: request.headers });

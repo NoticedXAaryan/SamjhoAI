@@ -10,6 +10,7 @@ services:
       DATABASE_URL: postgresql://samjho:${POSTGRES_PASSWORD}@postgres:5432/samjho
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      GUEST_SESSION_SECRET: ${GUEST_SESSION_SECRET:-${BETTER_AUTH_SECRET}}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
       LIVEKIT_URL: ${LIVEKIT_URL}
@@ -17,6 +18,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      livekit:
+        condition: service_started
     expose:
       - "3000"
 
@@ -34,6 +37,34 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  livekit:
+    image: livekit/livekit-server:v1.12.0
+    restart: unless-stopped
+    command: ["--config", "/etc/livekit.yaml"]
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    volumes:
+      - ./deploy/livekit.yaml:/etc/livekit.yaml:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    expose:
+      - "7880"
+      - "6789"
+    ports:
+      - "7881:7881/tcp"
+      - "7882:7882/udp"
 
 volumes:
   postgres-data:

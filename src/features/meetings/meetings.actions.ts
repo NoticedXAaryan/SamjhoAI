@@ -8,7 +8,7 @@ import { getSession } from '@/lib/auth';
 import { validate, MeetingTitleSchema, RoomNameSchema } from '@/shared/lib/validation';
 import { PrismaMeetingRepository } from './meetings.repository';
 import { MeetingService } from './meetings.service';
-import { RoomServiceClient } from 'livekit-server-sdk';
+import { deleteLiveKitRoom } from '@/infrastructure/livekit/livekit.gateway';
 
 async function requireUserId(): Promise<string> {
   const session = await getSession();
@@ -47,13 +47,5 @@ export async function endMeeting(rawRoomName: string) {
   const userId = await requireUserId();
   await makeService().endMeeting(roomName, userId);
 
-  const serverUrl = process.env.LIVEKIT_URL ?? process.env.NEXT_PUBLIC_LIVEKIT_URL;
-  const apiKey = process.env.LIVEKIT_API_KEY;
-  const apiSecret = process.env.LIVEKIT_API_SECRET;
-  if (!serverUrl || !apiKey || !apiSecret) {
-    throw new Error('LiveKit server credentials are not configured.');
-  }
-
-  const httpUrl = serverUrl.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
-  await new RoomServiceClient(httpUrl, apiKey, apiSecret).deleteRoom(roomName);
+  await deleteLiveKitRoom(roomName);
 }

@@ -1,4 +1,8 @@
-# Samjho AI — Project Brief
+# Archived project brief — historical reference only
+
+> This brief documents the retired Vite/Express/Socket.IO version. The deployable application is now a Next.js/Better Auth/Prisma/LiveKit modular monolith. Use [`README.md`](./README.md), [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md), and [`docs/FEATURES.md`](./docs/FEATURES.md) as the current sources of truth.
+
+# Samjho AI — Legacy Project Brief
 
 > Real-time accessible video conferencing with sign language recognition, live translation, and transcription.
 

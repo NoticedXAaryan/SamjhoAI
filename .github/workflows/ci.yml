@@ -32,6 +32,7 @@ jobs:
         run: npm run build
         env:
           BETTER_AUTH_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
+          GUEST_SESSION_SECRET: ci-only-guest-secret-0123456789abcdef0123456789
           BETTER_AUTH_URL: http://localhost:3000
           LIVEKIT_API_KEY: ci-key
           LIVEKIT_API_SECRET: ci-only-livekit-secret-0123456789abcdef

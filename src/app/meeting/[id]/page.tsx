@@ -17,10 +17,11 @@ export default function MeetingPage() {
   const [title, setTitle] = useState(roomName);
   const [isHost, setIsHost] = useState(false);
   const [userChoices, setUserChoices] = useState<LocalUserChoices | null>(null);
+  const [participant, setParticipant] = useState<{ userId: string; userName: string } | null>(null);
   const serverUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
   useEffect(() => {
-    if (isPending || !session?.user || !userChoices) return;
+    if (isPending || !userChoices) return;
     if (!serverUrl) {
       setError('LiveKit server URL is not configured. Check NEXT_PUBLIC_LIVEKIT_URL.');
       return;
@@ -32,13 +33,14 @@ export default function MeetingPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           cache: 'no-store',
-          body: JSON.stringify({ roomName }),
+          body: JSON.stringify({ roomName, displayName: userChoices.username }),
         });
         const data = await resp.json();
         if (resp.ok && data.token) {
           setToken(data.token);
           setTitle(data.title || roomName);
           setIsHost(Boolean(data.isHost));
+          setParticipant({ userId: data.userId, userName: data.userName });
         } else {
           setError(data.error || 'No token returned from LiveKit token API.');
         }
@@ -48,11 +50,11 @@ export default function MeetingPage() {
     })();
   }, [session, isPending, roomName, serverUrl, userChoices]);
 
-  if (!error && !isPending && session?.user && !userChoices) {
+  if (!error && !isPending && !userChoices) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#050507] p-4 text-white" data-lk-theme="default">
         <PreJoin
-          defaults={{ username: session.user.name, audioEnabled: true, videoEnabled: true }}
+          defaults={{ username: session?.user.name || '', audioEnabled: true, videoEnabled: true }}
           joinLabel="Join meeting"
           onSubmit={setUserChoices}
           onError={(preJoinError) => setError(preJoinError.message)}
@@ -79,7 +81,7 @@ export default function MeetingPage() {
     );
   }
 
-  if (token === '') {
+  if (token === '' || !participant || !userChoices) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-[#050507] text-white">
         <Loader2 className="mb-4 h-8 w-8 animate-spin text-cyan-400" />
@@ -94,10 +96,11 @@ export default function MeetingPage() {
       title={title}
       token={token}
       serverUrl={serverUrl}
-      userId={session?.user.id ?? 'unknown'}
-      userName={session?.user.name ?? 'User'}
+      userId={participant.userId}
+      userName={participant.userName}
       isHost={isHost}
-      userChoices={userChoices!}
+      returnHref={session?.user ? '/dashboard' : '/'}
+      userChoices={userChoices}
     />
   );
 }

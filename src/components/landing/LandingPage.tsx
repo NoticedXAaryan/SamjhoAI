@@ -5,6 +5,7 @@ import { useRef, useState, memo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useSession } from '@/lib/auth-client';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 import { Sparkles, Zap, Globe, Lock, Video, Shield, Download, Mic, MessageSquare, PhoneOff, Twitter, Linkedin, Github } from 'lucide-react';
 
 const DynamicIslandNav = memo(() => {
@@ -32,7 +33,7 @@ const DynamicIslandNav = memo(() => {
       >
         <div className="flex items-center px-3 sm:px-4 py-2 sm:py-2.5 gap-2 sm:gap-4 max-w-full">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-[#00FFFF]" />
+            <BrandLogo compact priority className="h-6 w-6" />
             <AnimatePresence>
               {isExpanded && (
                 <motion.span
@@ -514,8 +515,9 @@ export default function LandingPage() {
             style={{ opacity: textOpacity, y: textY }}
             className="text-center absolute top-[20%] z-10 w-full px-4 pointer-events-none"
           >
-            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-semibold tracking-tighter mb-4 text-white">Samjho AI</h1>
-            <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-medium text-[#a1a1a6] tracking-tight">Sign language, translated in real-time.</p>
+            <h1 className="sr-only">Samjho AI</h1>
+            <BrandLogo priority className="mx-auto mb-4 w-[min(92vw,560px)]" />
+            <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-medium text-[#a1a1a6] tracking-tight">Accessible video meetings with realtime captions.</p>
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 pointer-events-auto">
               <button 
                 onClick={handleStartMeeting}
@@ -583,7 +585,7 @@ export default function LandingPage() {
                     {/* AI Hand Tracking Overlay */}
                     <div className="absolute top-[30%] left-[20%] w-[40%] h-[40%] border border-[#00FFFF]/50 rounded-lg bg-[#00FFFF]/10 flex items-start p-2">
                        <div className="bg-[#00FFFF] text-black text-[10px] font-mono px-1.5 py-0.5 rounded-sm flex items-center gap-1">
-                         <Sparkles className="w-3 h-3" /> Tracking ASL
+                         <Sparkles className="w-3 h-3" /> Live captions
                        </div>
                     </div>
 
@@ -591,7 +593,7 @@ export default function LandingPage() {
                     <div className="absolute top-0 left-0 right-0 p-2 sm:p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
                       <div className="flex items-center gap-1 sm:gap-2 text-white">
                         <Shield className="w-3 h-3 sm:w-4 sm:h-4 text-green-400" />
-                        <span className="text-[10px] sm:text-xs font-medium">End-to-End Encrypted</span>
+                        <span className="text-[10px] sm:text-xs font-medium">Encrypted in transit</span>
                       </div>
                       <div className="bg-black/50 backdrop-blur-md px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-white text-[10px] sm:text-xs border border-white/10">
                         04:23
@@ -654,7 +656,7 @@ export default function LandingPage() {
             Get the highlights.
           </h2>
           <p className="text-base sm:text-lg md:text-xl text-[#86868b] mt-4 max-w-2xl font-medium">
-            Built from the ground up for the deaf and hard of hearing community, featuring breakthrough AI models.
+            Built for deaf and hard-of-hearing communities with shared captions, clear controls, and account-free guest joining.
           </p>
         </div>
 
@@ -709,7 +711,7 @@ export default function LandingPage() {
 
             <div className="relative z-10">
               <h3 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 tracking-tight text-white">&lt; 10ms</h3>
-              <p className="text-[#86868b] text-sm sm:text-base md:text-lg">Zero latency translation.</p>
+              <p className="text-[#86868b] text-sm sm:text-base md:text-lg">Shared caption delivery inside the room.</p>
             </div>
           </motion.div>
 
@@ -731,8 +733,8 @@ export default function LandingPage() {
             </div>
 
             <div className="relative z-10">
-              <h3 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 tracking-tight text-white">100+</h3>
-              <p className="text-[#86868b] text-sm sm:text-base md:text-lg">Languages supported globally.</p>
+              <h3 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 tracking-tight text-white">No account</h3>
+              <p className="text-[#86868b] text-sm sm:text-base md:text-lg">Guests join securely with a meeting link and display name.</p>
             </div>
           </motion.div>
 
@@ -756,7 +758,7 @@ export default function LandingPage() {
 
             <div className="relative z-10 h-full flex flex-col">
               <h3 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 tracking-tight text-white">Privacy First.</h3>
-              <p className="text-[#86868b] text-sm sm:text-base md:text-lg max-w-sm">Edge-computed processing. Your video never leaves your device.</p>
+              <p className="text-[#86868b] text-sm sm:text-base md:text-lg max-w-sm">Run the app, database, and media server on infrastructure you control.</p>
             </div>
           </motion.div>
         </div>
@@ -771,9 +773,9 @@ export default function LandingPage() {
           transition={{ duration: 0.7 }}
           className="text-center mb-12 sm:mb-16"
         >
-          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tighter text-white">Powered by advanced AI.</h2>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tighter text-white">Accessibility comes first.</h2>
           <p className="text-base sm:text-lg md:text-xl text-[#86868b] mt-4 max-w-2xl mx-auto font-medium">
-            We built a custom inference engine that runs directly in your browser, ensuring zero latency and absolute privacy.
+            Browser speech recognition, LiveKit realtime delivery, and self-hosted persistence provide a practical captioned meeting baseline.
           </p>
         </motion.div>
 
@@ -788,7 +790,7 @@ export default function LandingPage() {
           >
             <div className="text-5xl font-bold text-white mb-4 tracking-tighter group-hover:scale-110 transition-transform duration-500">60 FPS</div>
             <h3 className="text-lg font-semibold text-white mb-2">Real-time tracking</h3>
-            <p className="text-[#86868b] text-sm">Hardware-accelerated WebGL and WebGPU bring desktop-class AI to any device.</p>
+            <p className="text-[#86868b] text-sm">Caption messages are validated, topic-scoped, and delivered to everyone in the room.</p>
           </motion.div>
 
           {/* Accuracy */}
@@ -799,9 +801,9 @@ export default function LandingPage() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="pt-8 md:pt-0 md:px-8 flex flex-col items-center text-center group"
           >
-            <div className="text-5xl font-bold text-white mb-4 tracking-tighter group-hover:scale-110 transition-transform duration-500">99.8%</div>
-            <h3 className="text-lg font-semibold text-white mb-2">Flawless precision</h3>
-            <p className="text-[#86868b] text-sm">Trained on millions of hours of diverse sign language data for unmatched accuracy.</p>
+            <div className="text-5xl font-bold text-white mb-4 tracking-tighter group-hover:scale-110 transition-transform duration-500">Live</div>
+            <h3 className="text-lg font-semibold text-white mb-2">Shared captions</h3>
+            <p className="text-[#86868b] text-sm">Final browser speech-recognition results appear for remote participants and in the host transcript.</p>
           </motion.div>
 
           {/* Privacy */}
@@ -814,7 +816,7 @@ export default function LandingPage() {
           >
             <div className="text-5xl font-bold text-white mb-4 tracking-tighter group-hover:scale-110 transition-transform duration-500">Zero</div>
             <h3 className="text-lg font-semibold text-white mb-2">Cloud dependency</h3>
-            <p className="text-[#86868b] text-sm">Your video stream never leaves your device. All processing happens locally.</p>
+            <p className="text-[#86868b] text-sm">Your deployment controls the application, account database, transcript storage, and LiveKit media server.</p>
           </motion.div>
         </div>
       </section>
@@ -853,7 +855,7 @@ export default function LandingPage() {
             >
               <Video className="w-10 h-10 text-white/80 mb-6 relative z-10 group-hover:scale-110 transition-transform" />
               <h3 className="text-xl font-semibold mb-2 text-white relative z-10">Purpose-Built.</h3>
-              <p className="text-[#86868b] relative z-10">A standalone video conferencing platform optimized specifically for sign language.</p>
+              <p className="text-[#86868b] relative z-10">A standalone video conferencing platform optimized for clear, captioned communication.</p>
             </motion.div>
             <motion.div 
               initial={{ opacity: 0, y: 30 }}
@@ -863,8 +865,8 @@ export default function LandingPage() {
               className="bg-[#0a0a0a] rounded-[2rem] p-8 border border-white/10 hover:border-white/20 transition-all duration-500 relative overflow-hidden group"
             >
               <Lock className="w-10 h-10 text-white/80 mb-6 relative z-10 group-hover:scale-110 transition-transform" />
-              <h3 className="text-xl font-semibold mb-2 text-white relative z-10">Enterprise Secure.</h3>
-              <p className="text-[#86868b] relative z-10">End-to-end encrypted architecture designed for the most demanding corporate environments.</p>
+              <h3 className="text-xl font-semibold mb-2 text-white relative z-10">Self-hosted control.</h3>
+              <p className="text-[#86868b] relative z-10">Keep accounts, meetings, transcripts, and realtime media on infrastructure you operate.</p>
             </motion.div>
           </div>
         </div>
@@ -881,7 +883,7 @@ export default function LandingPage() {
           className="max-w-[600px] mx-auto text-center relative z-10"
         >
           <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tighter mb-6 text-white">Ready to break the barrier?</h2>
-          <p className="text-base sm:text-lg md:text-xl text-[#86868b] mb-8">Join thousands of users experiencing seamless sign language translation today.</p>
+          <p className="text-base sm:text-lg md:text-xl text-[#86868b] mb-8">Start an accessible meeting and invite anyone with a link.</p>
           <button 
             onClick={handleStartMeeting}
             className="bg-white text-black px-6 sm:px-8 py-3 sm:py-4 rounded-full text-base sm:text-lg font-semibold hover:scale-105 transition-transform shadow-[0_0_40px_rgba(255,255,255,0.3)]"
@@ -897,8 +899,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 mb-16">
             <div className="col-span-1 sm:col-span-2 md:col-span-1">
               <div className="flex items-center gap-2 mb-6">
-                <Sparkles className="w-5 h-5 text-[#00FFFF]" />
-                <span className="font-semibold text-white">Samjho AI</span>
+                <BrandLogo className="h-11 w-auto" />
               </div>
               <p className="text-[#86868b] text-sm mb-6">Understand everyone. Instantly.</p>
               <div className="flex gap-4">

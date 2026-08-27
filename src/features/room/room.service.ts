@@ -1,31 +1,18 @@
 // src/features/room/room.service.ts
-// S — Single Responsibility: only LiveKit token + room utilities
+// Compatibility wrapper. New server-side LiveKit behavior belongs in the gateway.
 
-import { AccessToken } from 'livekit-server-sdk';
+import { createLiveKitParticipantToken } from '@/infrastructure/livekit/livekit.gateway';
 
 export async function generateLiveKitToken(
   roomName: string,
   userId: string,
   userName: string
 ): Promise<string> {
-  const apiKey = process.env.LIVEKIT_API_KEY;
-  const apiSecret = process.env.LIVEKIT_API_SECRET;
-
-  if (!apiKey || !apiSecret) {
-    throw new Error('LiveKit credentials not configured');
-  }
-
-  const at = new AccessToken(apiKey, apiSecret, {
-    identity: userId,
-    name: userName,
+  return createLiveKitParticipantToken({
+    roomName,
+    participantId: userId,
+    participantName: userName,
+    isHost: false,
+    isGuest: false,
   });
-
-  at.addGrant({
-    roomJoin: true,
-    room: roomName,
-    canPublish: true,
-    canSubscribe: true,
-  });
-
-  return await at.toJwt();
 }

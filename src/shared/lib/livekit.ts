@@ -9,7 +9,10 @@ export async function broadcastCaption(room: Room, caption: CaptionPacket): Prom
   if (!room?.localParticipant) return;
   const payload = new TextEncoder().encode(JSON.stringify(caption));
   window.dispatchEvent(new CustomEvent<CaptionPacket>(LOCAL_CAPTION_EVENT, { detail: caption }));
-  await room.localParticipant.publishData(payload as any, { reliable: true, topic: CAPTION_TOPIC });
+  await room.localParticipant.publishData(payload as Uint8Array<ArrayBuffer>, {
+    reliable: true,
+    topic: CAPTION_TOPIC,
+  });
 }
 
 export function parseCaptionPacket(payload: Uint8Array): CaptionPacket | null {

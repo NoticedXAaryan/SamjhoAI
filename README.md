@@ -27,6 +27,7 @@ Our goal is to build a highly usable, real-world ready system that makes communi
 | 📝 **Live captions** | Browser speech recognition, reliable in-room caption broadcast, and host transcript export |
 | 🎥 **Video meetings** | Prejoin preview, mic, camera, screen share, remote audio, grid layouts, chat, and participant list |
 | 🔐 **Self-hosted auth** | Better Auth email/password accounts and sessions stored in PostgreSQL |
+| 🔗 **Guest joining** | Participants can join a valid meeting link with a display name and no account |
 | 🤟 **Sign recognition** | Planned; the current release does not claim an implemented gesture-recognition model |
 | 🌐 **Translation** | Planned after the reliable meeting baseline is complete |
 
@@ -51,12 +52,12 @@ Samjho AI is a unified **Next.js App Router** application designed for a self-ho
 
 ### Current State (MVP)
 - **Auth**: Better Auth sign-up/sign-in/sign-out
-- **Meetings**: Create/join meetings, persisted to Postgres (Prisma)
+- **Meetings**: Authenticated meeting creation plus signed, room-scoped guest joining
 - **Meeting room**: Prejoin device selection, LiveKit grid, remote audio, mic/cam/screen share controls, reconnection state, chat, and participants sidebar
 - **Realtime captions**: Reliable, validated, topic-scoped LiveKit data messages plus transcript persistence
 - **Summary**: `/meeting/[id]/summary` shows transcript and downloads `.txt`
 
-For the full roadmap, see [`ROADMAP.md`](./ROADMAP.md).
+For verified behavior and remaining limitations, see [`docs/FEATURES.md`](./docs/FEATURES.md).
 
 ---
 
@@ -66,14 +67,18 @@ The repository is being recovered in phases: deployable self-hosted foundation f
 
 | Document | Purpose |
 |----------|---------|
-| **[`ROADMAP.md`](./ROADMAP.md)** | 12–16 week sprint-by-sprint plan with 8 sprints to reach 95% production readiness |
-| **[`PROJECT_BRIEF.md`](./PROJECT_BRIEF.md)** | Original project vision, goals, and problem statement |
+| **[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)** | Current boundaries, request flows, identity model, and dependency rules |
+| **[`docs/FEATURES.md`](./docs/FEATURES.md)** | Implemented baseline and explicitly planned capabilities |
+| **[`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md)** | Local setup, environment, database, and development workflow |
+| **[`docs/TESTING.md`](./docs/TESTING.md)** | Automated gates and manual multi-browser meeting verification |
+| **[`docs/SECURITY.md`](./docs/SECURITY.md)** | Trust boundaries, guest-session design, secrets, and known gaps |
+| **[`docs/OPERATIONS.md`](./docs/OPERATIONS.md)** | Health checks, backups, upgrades, rollback, and incident checks |
 | **[`deploy/SELF_HOSTING.md`](./deploy/SELF_HOSTING.md)** | Dokploy, networking, secrets, health checks, and backup guidance |
 
 ### Quick Navigation
 
 **Just getting started?**  
-→ Read [`ROADMAP.md`](./ROADMAP.md) for the high-level plan and sprint breakdown.
+→ Read [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md), then [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
 ---
 
@@ -103,6 +108,7 @@ Add your keys:
 # Better Auth
 BETTER_AUTH_SECRET=your-long-random-secret-min-32-chars
 BETTER_AUTH_URL=http://localhost:3000
+GUEST_SESSION_SECRET=another-long-random-secret-min-32-chars
 
 # PostgreSQL
 DATABASE_URL=postgresql://user:password@localhost:5432/samjho
@@ -127,7 +133,7 @@ Open **[http://localhost:3000](http://localhost:3000)**
 
 ## Deploy on Dokploy
 
-The repository includes a production `Dockerfile`, health endpoints, Prisma migrations, and `compose.self-hosted.yml` for the application, PostgreSQL, Redis, and LiveKit. See [`deploy/SELF_HOSTING.md`](./deploy/SELF_HOSTING.md) for domains, secrets, ports, backups, and verification.
+The repository includes a production `Dockerfile`, health endpoints, Prisma migrations, and `docker-compose.yml` for the application, PostgreSQL, Redis, and LiveKit. See [`deploy/SELF_HOSTING.md`](./deploy/SELF_HOSTING.md) for domains, secrets, ports, backups, and verification.
 
 ---
 

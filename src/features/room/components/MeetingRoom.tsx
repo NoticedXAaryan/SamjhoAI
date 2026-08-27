@@ -39,10 +39,11 @@ interface Props {
   userId: string;
   userName: string;
   isHost: boolean;
+  returnHref: string;
   userChoices: LocalUserChoices;
 }
 
-export function MeetingRoom({ roomName, title, token, serverUrl, userId, userName, isHost, userChoices }: Props) {
+export function MeetingRoom({ roomName, title, token, serverUrl, userId, userName, isHost, returnHref, userChoices }: Props) {
   const router = useRouter();
   const [showSidebar, setShowSidebar] = useState(false);
   const [showChat, setShowChat] = useState(false);
@@ -105,6 +106,7 @@ export function MeetingRoom({ roomName, title, token, serverUrl, userId, userNam
       <ControlBar
         roomName={roomName}
         isHost={isHost}
+        returnHref={returnHref}
         onSettingsOpen={() => setShowSettings(true)}
       />
 
@@ -119,7 +121,7 @@ export function MeetingRoom({ roomName, title, token, serverUrl, userId, userNam
           <div className="max-w-md rounded-2xl border border-white/10 bg-slate-950 p-8">
             <h2 className="text-xl font-semibold">Meeting disconnected</h2>
             <p className="mt-2 text-sm text-white/60">The host may have ended the meeting, or the connection could not be restored.</p>
-            <Button className="mt-6" onClick={() => router.push('/dashboard')}>Back to dashboard</Button>
+            <Button className="mt-6" onClick={() => router.push(returnHref)}>Leave meeting</Button>
           </div>
         </div>
       )}

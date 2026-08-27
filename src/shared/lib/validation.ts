@@ -10,6 +10,13 @@ export const RoomNameSchema = z
   .max(50)
   .regex(/^[a-z0-9-]+$/, 'Invalid room code format');
 
+export const GuestDisplayNameSchema = z
+  .string()
+  .trim()
+  .min(2, 'Enter a display name with at least 2 characters.')
+  .max(80, 'Display name must be 80 characters or fewer.')
+  .regex(/^[^<>\u0000-\u001f\u007f]+$/, 'Display name contains unsupported characters.');
+
 export const CaptionSegmentSchema = z.object({
   timestamp: z.number(),
   type: z.enum(['speech', 'gesture']),
