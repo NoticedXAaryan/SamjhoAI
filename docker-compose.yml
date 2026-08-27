@@ -12,13 +12,11 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
-      LIVEKIT_URL: http://livekit:7880
+      LIVEKIT_URL: ${LIVEKIT_URL}
       NEXT_PUBLIC_LIVEKIT_URL: ${NEXT_PUBLIC_LIVEKIT_URL}
     depends_on:
       postgres:
         condition: service_healthy
-      livekit:
-        condition: service_started
     expose:
       - "3000"
 
@@ -37,30 +35,5 @@ services:
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis-data:/data
-
-  livekit:
-    image: livekit/livekit-server:v1.9.9
-    restart: unless-stopped
-    command: ["--config", "/etc/livekit.yaml"]
-    environment:
-      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
-    volumes:
-      - ./deploy/livekit.yaml:/etc/livekit.yaml:ro
-    depends_on:
-      - redis
-    expose:
-      - "7880"
-      - "6789"
-    ports:
-      - "7881:7881"
-      - "7882:7882/udp"
-
 volumes:
   postgres-data:
-  redis-data:
