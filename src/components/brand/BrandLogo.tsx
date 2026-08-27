@@ -7,20 +7,21 @@ type BrandLogoProps = {
   priority?: boolean;
 };
 
-const logoSource = '/brand/samjho-ai-logo-eclipse-ui.png';
+const lockupSource = '/brand/samjho-ai-logo-transparent.png';
+const markSource = '/brand/samjho-ai-mark-transparent.png';
 
 export function BrandLogo({ compact = false, className, priority = false }: BrandLogoProps) {
   if (compact) {
     return (
       <span className={cn('relative block aspect-square shrink-0 overflow-hidden', className)}>
         <Image
-          src={logoSource}
+          src={markSource}
           alt=""
           aria-hidden="true"
-          width={2048}
-          height={768}
+          fill
+          sizes="64px"
           priority={priority}
-          className="h-full w-auto max-w-none"
+          className="object-contain"
         />
       </span>
     );
@@ -28,7 +29,7 @@ export function BrandLogo({ compact = false, className, priority = false }: Bran
 
   return (
     <Image
-      src={logoSource}
+      src={lockupSource}
       alt="Samjho AI"
       width={2048}
       height={768}

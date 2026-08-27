@@ -51,8 +51,6 @@ export function MeetingRoom({ roomName, title, token, serverUrl, userId, userNam
   const [prefs, setPrefs] = useState<AccessibilityPreferences>(defaults);
   const [disconnected, setDisconnected] = useState(false);
 
-  const stt = useSpeechToText(roomName, userId, userName);
-
   return (
     <LiveKitRoom
       token={token}
@@ -89,18 +87,7 @@ export function MeetingRoom({ roomName, title, token, serverUrl, userId, userNam
             <Chat channelTopic="samjho-chat" />
           </aside>
         )}
-
-        {/* Speech captions toggle */}
-        <div className="absolute left-4 top-16 z-[80] flex items-center gap-2 rounded-full border border-white/10 bg-black/60 px-3 py-2 backdrop-blur">
-          <span className="text-xs text-white/70">Speech captions</span>
-          <Button
-            size="sm"
-            variant={stt.enabled ? 'secondary' : 'default'}
-            onClick={stt.enabled ? stt.stop : stt.start}
-          >
-            {stt.enabled ? 'Stop' : 'Start'}
-          </Button>
-        </div>
+        <SpeechCaptionControl roomName={roomName} userId={userId} userName={userName} />
       </div>
 
       <ControlBar
@@ -126,6 +113,27 @@ export function MeetingRoom({ roomName, title, token, serverUrl, userId, userNam
         </div>
       )}
     </LiveKitRoom>
+  );
+}
+
+function SpeechCaptionControl({
+  roomName,
+  userId,
+  userName,
+}: Pick<Props, 'roomName' | 'userId' | 'userName'>) {
+  const stt = useSpeechToText(roomName, userId, userName);
+
+  return (
+    <div className="absolute left-4 top-16 z-[80] flex items-center gap-2 rounded-full border border-white/10 bg-black/60 px-3 py-2 backdrop-blur">
+      <span className="text-xs text-white/70">Speech captions</span>
+      <Button
+        size="sm"
+        variant={stt.enabled ? 'secondary' : 'default'}
+        onClick={stt.enabled ? stt.stop : stt.start}
+      >
+        {stt.enabled ? 'Stop' : 'Start'}
+      </Button>
+    </div>
   );
 }
 

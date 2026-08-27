@@ -1,5 +1,7 @@
 # Self-hosting with Dokploy
 
+> This is the current deployment runbook. It includes temporary recovery workarounds; the permanent deployment design and open release blockers are tracked in [`../docs/engineering/TARGET_ARCHITECTURE.md`](../docs/engineering/TARGET_ARCHITECTURE.md) and [`../docs/engineering/ISSUE_REGISTER.md`](../docs/engineering/ISSUE_REGISTER.md).
+
 Samjho AI has no required paid API dependency. Authentication and application data use PostgreSQL, and realtime media uses the open-source LiveKit server.
 
 ## Required secrets and domains

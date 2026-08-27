@@ -1,11 +1,34 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Toaster } from 'sonner';
 import { AuthHeader } from '@/features/auth/components/AuthHeader';
 import './globals.css';
 
+const metadataBase = new URL(process.env.BETTER_AUTH_URL ?? 'http://localhost:3000');
+
 export const metadata: Metadata = {
-  title: 'Samjho AI',
+  metadataBase,
+  applicationName: 'Samjho AI',
+  title: {
+    default: 'Samjho AI',
+    template: '%s | Samjho AI',
+  },
   description: 'Real-time accessible video conferencing with live captions.',
+  keywords: ['accessible video conferencing', 'live captions', 'sign language', 'realtime meetings'],
+  openGraph: {
+    type: 'website',
+    title: 'Samjho AI',
+    description: 'Accessible video meetings with realtime captions, chat, and transcripts.',
+    siteName: 'Samjho AI',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Samjho AI',
+    description: 'Accessible video meetings with realtime captions, chat, and transcripts.',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#050507',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

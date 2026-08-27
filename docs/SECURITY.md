@@ -1,5 +1,7 @@
 # Security model
 
+> This is a current trust-boundary summary. Prioritized remediation and completion criteria are maintained in [`engineering/ISSUE_REGISTER.md`](./engineering/ISSUE_REGISTER.md).
+
 ## Trust boundaries
 
 Browser input is untrusted. The server validates meeting codes, display names, captions, account sessions, and signed guest sessions before using them. LiveKit tokens are generated only on the server and are scoped to one room.

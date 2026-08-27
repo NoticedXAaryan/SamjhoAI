@@ -1,8 +1,9 @@
 'use client';
 
-import { motion, useScroll, useTransform, AnimatePresence } from 'motion/react';
+import { motion, useMotionValueEvent, useReducedMotion, useScroll, useTransform, AnimatePresence } from 'motion/react';
 import { useRef, useState, memo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
 import { useSession } from '@/lib/auth-client';
 import { BrandLogo } from '@/components/brand/BrandLogo';
@@ -440,10 +441,79 @@ const CVBackground = memo(() => {
 });
 CVBackground.displayName = 'CVBackground';
 
+const footerHandPoints = [
+  [450, 318], [392, 286], [330, 248], [270, 205], [214, 158],
+  [412, 238], [376, 172], [355, 105], [342, 46],
+  [450, 226], [448, 150], [450, 80], [455, 24],
+  [492, 236], [520, 168], [542, 98], [558, 48],
+  [530, 264], [585, 213], [626, 158], [655, 112],
+] as const;
+
+const footerHandConnections = [
+  [0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8],
+  [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15],
+  [15, 16], [13, 17], [17, 18], [18, 19], [19, 20], [0, 17],
+] as const;
+
+const FooterGestureField = memo(() => (
+  <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+    <motion.svg
+      viewBox="0 0 1200 420"
+      className="absolute inset-0 h-full w-full opacity-[0.14]"
+      initial={{ opacity: 0.05 }}
+      whileInView={{ opacity: 0.14 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 1.6, ease: 'easeOut' }}
+    >
+      <defs>
+        <filter id="footer-gesture-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+      {['translate(-90 65) scale(.75)', 'translate(1180 350) scale(-.72 -.72)'].map((transform, handIndex) => (
+        <g key={transform} transform={transform} filter="url(#footer-gesture-glow)">
+          {footerHandConnections.map(([from, to]) => (
+            <motion.line
+              key={`${handIndex}-${from}-${to}`}
+              x1={footerHandPoints[from][0]}
+              y1={footerHandPoints[from][1]}
+              x2={footerHandPoints[to][0]}
+              y2={footerHandPoints[to][1]}
+              stroke="white"
+              strokeWidth="1.6"
+              initial={{ pathLength: 0, opacity: 0 }}
+              whileInView={{ pathLength: 1, opacity: 0.48 }}
+              viewport={{ once: true }}
+              transition={{ duration: 1.1, delay: handIndex * 0.18 + from * 0.018 }}
+            />
+          ))}
+          {footerHandPoints.map(([x, y], index) => (
+            <motion.circle
+              key={`${handIndex}-${x}-${y}`}
+              cx={x}
+              cy={y}
+              r={index % 4 === 0 ? 4 : 2.5}
+              fill="white"
+              initial={{ opacity: 0, scale: 0 }}
+              whileInView={{ opacity: index % 4 === 0 ? 0.65 : 0.4, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: 0.2 + handIndex * 0.18 + index * 0.018 }}
+            />
+          ))}
+        </g>
+      ))}
+    </motion.svg>
+    <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" />
+  </div>
+));
+FooterGestureField.displayName = 'FooterGestureField';
+
 export default function LandingPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const isSignedIn = Boolean(session);
+  const prefersReducedMotion = useReducedMotion();
 
   const handleStartMeeting = () => {
     if (isSignedIn) {
@@ -454,6 +524,10 @@ export default function LandingPage() {
   };
 
   const heroRef = useRef<HTMLDivElement>(null);
+  const snapTimerRef = useRef<number | null>(null);
+  const snapReleaseTimerRef = useRef<number | null>(null);
+  const isSettlingRef = useRef(false);
+  const lastDirectScrollRef = useRef(0);
   const { scrollYProgress: heroProgress } = useScroll({
     target: heroRef,
     offset: ["start start", "end start"]
@@ -476,6 +550,33 @@ export default function LandingPage() {
   
   const textOpacity = useTransform(heroProgress, [0, 0.15], [1, 0]);
   const textY = useTransform(heroProgress, [0, 0.15], [0, -50]);
+
+  useMotionValueEvent(heroProgress, 'change', (progress) => {
+    const followedDirectScroll = Date.now() - lastDirectScrollRef.current < 500;
+    if (!followedDirectScroll || prefersReducedMotion || isSettlingRef.current || progress <= 0.02 || progress >= 0.98) return;
+
+    if (snapTimerRef.current !== null) window.clearTimeout(snapTimerRef.current);
+    snapTimerRef.current = window.setTimeout(() => {
+      const section = heroRef.current;
+      if (!section) return;
+
+      const stops = [0, 0.14, 0.4, 0.66, 0.9, 1];
+      const destination = stops.reduce((closest, stop) => (
+        Math.abs(stop - progress) < Math.abs(closest - progress) ? stop : closest
+      ));
+      if (Math.abs(destination - progress) < 0.025) return;
+
+      const sectionTop = section.getBoundingClientRect().top + window.scrollY;
+      const travel = Math.max(section.offsetHeight - window.innerHeight, 1);
+      isSettlingRef.current = true;
+      window.scrollTo({ top: sectionTop + destination * travel, behavior: 'smooth' });
+
+      if (snapReleaseTimerRef.current !== null) window.clearTimeout(snapReleaseTimerRef.current);
+      snapReleaseTimerRef.current = window.setTimeout(() => {
+        isSettlingRef.current = false;
+      }, 850);
+    }, 220);
+  });
 
   useEffect(() => {
     const apiBase = process.env.NEXT_PUBLIC_API_URL ?? '';
@@ -503,6 +604,23 @@ export default function LandingPage() {
     };
   }, []);
 
+  useEffect(() => () => {
+    if (snapTimerRef.current !== null) window.clearTimeout(snapTimerRef.current);
+    if (snapReleaseTimerRef.current !== null) window.clearTimeout(snapReleaseTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    const registerDirectScroll = () => {
+      lastDirectScrollRef.current = Date.now();
+    };
+    window.addEventListener('wheel', registerDirectScroll, { passive: true });
+    window.addEventListener('touchend', registerDirectScroll, { passive: true });
+    return () => {
+      window.removeEventListener('wheel', registerDirectScroll);
+      window.removeEventListener('touchend', registerDirectScroll);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-black text-[#f5f5f7] font-sans selection:bg-[#00FFFF]/30">
       <DynamicIslandNav />
@@ -515,8 +633,7 @@ export default function LandingPage() {
             style={{ opacity: textOpacity, y: textY }}
             className="text-center absolute top-[20%] z-10 w-full px-4 pointer-events-none"
           >
-            <h1 className="sr-only">Samjho AI</h1>
-            <BrandLogo priority className="mx-auto mb-4 w-[min(92vw,560px)]" />
+            <h1 className="mb-4 text-5xl font-semibold tracking-tighter text-white sm:text-6xl md:text-7xl lg:text-8xl">Samjho AI</h1>
             <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-medium text-[#a1a1a6] tracking-tight">Accessible video meetings with realtime captions.</p>
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 pointer-events-auto">
               <button 
@@ -561,8 +678,8 @@ export default function LandingPage() {
                 className="absolute inset-[-4px] bg-gradient-to-b from-[#2a2a2a] to-[#1a1a1a] rounded-2xl border border-[#444] flex items-center justify-center backface-hidden"
                 style={{ transform: 'translateZ(-1px) rotateY(180deg)', backfaceVisibility: 'hidden' }}
               >
-                <div className="w-16 h-16 rounded-full border border-white/10 flex items-center justify-center bg-white/5 shadow-[0_0_30px_rgba(0,255,255,0.1)]">
-                  <Sparkles className="w-8 h-8 text-[#00FFFF]" />
+                <div className="h-20 w-20 rounded-full border border-white/10 bg-black/25 p-3 shadow-[0_0_30px_rgba(0,255,255,0.1)]">
+                  <BrandLogo compact className="h-full w-full" />
                 </div>
               </div>
 
@@ -894,58 +1011,53 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-[#050507] pt-20 pb-10 px-6 border-t border-white/10">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 mb-16">
-            <div className="col-span-1 sm:col-span-2 md:col-span-1">
-              <div className="flex items-center gap-2 mb-6">
-                <BrandLogo className="h-11 w-auto" />
-              </div>
-              <p className="text-[#86868b] text-sm mb-6">Understand everyone. Instantly.</p>
-              <div className="flex gap-4">
-                <a href="#" className="text-[#86868b] hover:text-white transition-colors"><Twitter className="w-5 h-5" /></a>
-                <a href="#" className="text-[#86868b] hover:text-white transition-colors"><Linkedin className="w-5 h-5" /></a>
-                <a href="#" className="text-[#86868b] hover:text-white transition-colors"><Github className="w-5 h-5" /></a>
-              </div>
-            </div>
-            
+      <footer id="footer" className="relative overflow-hidden border-t border-white/10 bg-[#030304]">
+        <div className="relative overflow-hidden bg-white/[0.018] backdrop-blur-3xl">
+          <FooterGestureField />
+          <div className="relative z-10 mx-auto grid max-w-[1200px] grid-cols-1 gap-12 px-6 py-16 sm:grid-cols-2 sm:py-20 lg:grid-cols-[1.45fr_repeat(3,1fr)] lg:gap-16">
             <div>
-              <h4 className="text-white font-semibold mb-4">Product</h4>
-              <ul className="space-y-3 text-sm text-[#86868b]">
-                <li><a href="#" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Integrations</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Changelog</a></li>
-              </ul>
+              <Link href="/" aria-label="Samjho AI home" className="inline-flex">
+                <BrandLogo className="h-14 w-auto" />
+              </Link>
+              <p className="mt-5 max-w-xs text-sm leading-6 text-white/50">Accessible meetings where captions, gestures, and conversation stay in the same room.</p>
+              <div className="mt-6 inline-flex items-center gap-2 text-xs text-white/55">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
+                Built for inclusive conversation
+              </div>
+              <div className="mt-6 flex gap-3">
+                {[
+                  { label: 'Samjho AI on X', Icon: Twitter },
+                  { label: 'Samjho AI on LinkedIn', Icon: Linkedin },
+                  { label: 'Samjho AI on GitHub', Icon: Github },
+                ].map(({ label, Icon }) => (
+                  <a key={label} href="#" aria-label={label} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/25 text-white/55 transition hover:border-white/25 hover:text-white">
+                    <Icon className="h-4 w-4" />
+                  </a>
+                ))}
+              </div>
             </div>
 
-            <div>
-              <h4 className="text-white font-semibold mb-4">Resources</h4>
-              <ul className="space-y-3 text-sm text-[#86868b]">
-                <li><a href="#" className="hover:text-white transition-colors">Documentation</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API Reference</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Community</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-white font-semibold mb-4">Company</h4>
-              <ul className="space-y-3 text-sm text-[#86868b]">
-                <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
-              </ul>
-            </div>
+            {[
+              { heading: 'Product', links: [['Start a meeting', '/meeting'], ['Dashboard', '/dashboard'], ['Desktop app', '/download']] },
+              { heading: 'Resources', links: [['Live captions', '/meeting'], ['Meeting summaries', '/dashboard'], ['Create account', '/sign-up']] },
+              { heading: 'Company', links: [['Sign in', '/sign-in'], ['Privacy by design', '/'], ['Accessibility', '/']] },
+            ].map((column) => (
+              <div key={column.heading}>
+                <h4 className="text-sm font-semibold text-white">{column.heading}</h4>
+                <ul className="mt-5 space-y-3.5 text-sm text-white/45">
+                  {column.links.map(([label, href]) => (
+                    <li key={label}>
+                      <Link href={href} className="transition-colors hover:text-white">{label}</Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
 
-          <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-[#86868b] text-center md:text-left">
-            <p>Copyright © 2026 Samjho AI Inc. All rights reserved.</p>
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-6">
-              <span>1. Translation latency varies by network.</span>
-              <span>2. Currently in beta.</span>
-            </div>
+          <div className="relative z-10 mx-auto flex max-w-[1200px] flex-col gap-3 border-t border-white/10 px-6 py-5 text-xs text-white/35 sm:flex-row sm:items-center sm:justify-between">
+            <p>© 2026 Samjho AI. Accessible conversation, without the barrier.</p>
+            <p>Realtime captions · Link-based guest access · Self-hosted control</p>
           </div>
         </div>
       </footer>

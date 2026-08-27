@@ -1,5 +1,7 @@
 # Development guide
 
+> Before structural or deployment work, read [`engineering/AI_HANDOFF.md`](./engineering/AI_HANDOFF.md) and follow the ordered plan in [`engineering/DELIVERY_PLAN.md`](./engineering/DELIVERY_PLAN.md).
+
 ## Prerequisites
 
 - Node.js 22 or newer.

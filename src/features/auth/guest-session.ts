@@ -1,5 +1,6 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
+import { getGuestSessionSecret } from '@/config/env';
 
 const COOKIE_NAME = 'samjho_guest';
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
@@ -12,11 +13,7 @@ export interface GuestSession {
 }
 
 function getSigningSecret() {
-  const secret = process.env.GUEST_SESSION_SECRET || process.env.BETTER_AUTH_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error('Guest sessions require GUEST_SESSION_SECRET or BETTER_AUTH_SECRET with at least 32 characters.');
-  }
-  return secret;
+  return getGuestSessionSecret();
 }
 
 function sign(payload: string, secret: string) {

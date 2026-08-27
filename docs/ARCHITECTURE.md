@@ -1,5 +1,7 @@
 # Architecture
 
+> This is the short architecture guide. For the evidence-backed audit, target state, and known contradictions, use [`engineering/CURRENT_STATE.md`](./engineering/CURRENT_STATE.md) and [`engineering/TARGET_ARCHITECTURE.md`](./engineering/TARGET_ARCHITECTURE.md).
+
 SamjhoAI is a self-hosted modular monolith. One Next.js deployment owns the browser UI, API routes, server actions, authentication integration, meeting domain logic, and persistence. LiveKit is a separate realtime media service; PostgreSQL is the durable source of truth; Redis coordinates LiveKit nodes.
 
 ## Runtime topology

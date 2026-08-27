@@ -1,5 +1,7 @@
 # Feature status
 
+> This is the concise product view. The authoritative gap inventory and acceptance criteria are in [`engineering/ISSUE_REGISTER.md`](./engineering/ISSUE_REGISTER.md).
+
 This document separates verified baseline behavior from planned work. Marketing copy must not claim planned capabilities as implemented.
 
 ## Implemented baseline

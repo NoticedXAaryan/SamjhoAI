@@ -1,5 +1,7 @@
 # Testing strategy
 
+> This describes the current test commands. It does not certify production readiness; verified coverage and missing test layers are recorded in [`engineering/CURRENT_STATE.md`](./engineering/CURRENT_STATE.md) and issues `TEST-001`/`TEST-002`.
+
 ## Automated gate
 
 `npm run check` runs lint, TypeScript, Vitest, and the production Next.js build. CI runs the same categories on Node.js 22.

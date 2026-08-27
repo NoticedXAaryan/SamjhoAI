@@ -1,4 +1,5 @@
 import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
+import { getLiveKitEnvironment } from '@/config/env';
 
 export interface LiveKitParticipantTokenInput {
   roomName: string;
@@ -8,22 +9,9 @@ export interface LiveKitParticipantTokenInput {
   isGuest: boolean;
 }
 
-function credentials() {
-  const apiKey = process.env.LIVEKIT_API_KEY;
-  const apiSecret = process.env.LIVEKIT_API_SECRET;
-  if (!apiKey || !apiSecret) throw new Error('LiveKit credentials not configured.');
-  return { apiKey, apiSecret };
-}
-
-function administrationUrl() {
-  const configured = process.env.LIVEKIT_URL || process.env.NEXT_PUBLIC_LIVEKIT_URL;
-  if (!configured) throw new Error('LiveKit server URL not configured.');
-  return configured.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
-}
-
 export async function createLiveKitParticipantToken(input: LiveKitParticipantTokenInput) {
-  const { apiKey, apiSecret } = credentials();
-  const token = new AccessToken(apiKey, apiSecret, {
+  const { LIVEKIT_API_KEY, LIVEKIT_API_SECRET } = getLiveKitEnvironment();
+  const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
     identity: `${input.participantId}:${crypto.randomUUID()}`,
     name: input.participantName,
     metadata: JSON.stringify({
@@ -45,6 +33,6 @@ export async function createLiveKitParticipantToken(input: LiveKitParticipantTok
 }
 
 export async function deleteLiveKitRoom(roomName: string) {
-  const { apiKey, apiSecret } = credentials();
-  await new RoomServiceClient(administrationUrl(), apiKey, apiSecret).deleteRoom(roomName);
+  const { LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_URL } = getLiveKitEnvironment();
+  await new RoomServiceClient(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET).deleteRoom(roomName);
 }

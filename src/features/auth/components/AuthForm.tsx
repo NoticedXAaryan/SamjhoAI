@@ -44,19 +44,20 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   }
 
   return (
-    <form onSubmit={submit} className="w-full max-w-md space-y-5 rounded-3xl border border-white/10 bg-black/60 p-8 shadow-2xl">
+    <form onSubmit={submit} className="w-full space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold">{isSignUp ? 'Create your account' : 'Welcome back'}</h1>
-        <p className="mt-2 text-sm text-white/60">Self-hosted authentication. Your account stays in your PostgreSQL database.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300/80">{isSignUp ? 'Get started' : 'Welcome back'}</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">{isSignUp ? 'Create your account' : 'Sign in to Samjho'}</h1>
+        <p className="mt-3 text-sm leading-6 text-white/50">{isSignUp ? 'Create your secure account to host accessible meetings.' : 'Continue to your meetings, captions, and saved summaries.'}</p>
       </div>
-      {isSignUp && <div className="space-y-2"><Label htmlFor="name">Name</Label><Input id="name" autoComplete="name" required minLength={2} maxLength={100} value={name} onChange={(e) => setName(e.target.value)} /></div>}
-      <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-      <div className="space-y-2"><Label htmlFor="password">Password</Label><Input id="password" type="password" autoComplete={isSignUp ? 'new-password' : 'current-password'} required minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+      {isSignUp && <div className="space-y-2"><Label htmlFor="name" className="text-sm text-white/70">Name</Label><Input className="h-12 rounded-xl border-white/10 bg-white/[0.055] px-4 focus-visible:border-cyan-300/50 focus-visible:ring-cyan-300/20" id="name" placeholder="Your name" autoComplete="name" required minLength={2} maxLength={100} value={name} onChange={(e) => setName(e.target.value)} /></div>}
+      <div className="space-y-2"><Label htmlFor="email" className="text-sm text-white/70">Email</Label><Input className="h-12 rounded-xl border-white/10 bg-white/[0.055] px-4 focus-visible:border-cyan-300/50 focus-visible:ring-cyan-300/20" id="email" type="email" placeholder="you@example.com" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+      <div className="space-y-2"><Label htmlFor="password" className="text-sm text-white/70">Password</Label><Input className="h-12 rounded-xl border-white/10 bg-white/[0.055] px-4 focus-visible:border-cyan-300/50 focus-visible:ring-cyan-300/20" id="password" type="password" placeholder="At least 10 characters" autoComplete={isSignUp ? 'new-password' : 'current-password'} required minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} /></div>
       {error && <p role="alert" className="rounded-xl bg-red-500/15 px-3 py-2 text-sm text-red-300">{error}</p>}
-      <Button type="submit" disabled={pending} className="w-full">{pending ? 'Please wait…' : isSignUp ? 'Create account' : 'Sign in'}</Button>
+      <Button type="submit" disabled={pending} className="h-12 w-full rounded-xl bg-white font-semibold text-black hover:bg-white/90">{pending ? 'Please wait…' : isSignUp ? 'Create account' : 'Sign in'}</Button>
       <p className="text-center text-sm text-white/60">
         {isSignUp ? 'Already have an account?' : 'Need an account?'}{' '}
-        <Link className="text-cyan-300 hover:text-cyan-200" href={isSignUp ? '/sign-in' : '/sign-up'}>{isSignUp ? 'Sign in' : 'Sign up'}</Link>
+        <Link className="font-medium text-cyan-300 hover:text-cyan-200" href={isSignUp ? '/sign-in' : '/sign-up'}>{isSignUp ? 'Sign in' : 'Sign up'}</Link>
       </p>
     </form>
   );

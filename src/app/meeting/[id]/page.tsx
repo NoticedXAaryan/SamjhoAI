@@ -4,8 +4,9 @@ import '@livekit/components-styles';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { PreJoin, type LocalUserChoices } from '@livekit/components-react';
+import type { LocalUserChoices } from '@livekit/components-react';
 import { MeetingRoom as MeetingRoomShell } from '@/features/room/components/MeetingRoom';
+import { MeetingPreJoin } from '@/features/room/components/MeetingPreJoin';
 import { useSession } from '@/lib/auth-client';
 
 export default function MeetingPage() {
@@ -52,14 +53,11 @@ export default function MeetingPage() {
 
   if (!error && !isPending && !userChoices) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#050507] p-4 text-white" data-lk-theme="default">
-        <PreJoin
-          defaults={{ username: session?.user.name || '', audioEnabled: true, videoEnabled: true }}
-          joinLabel="Join meeting"
-          onSubmit={setUserChoices}
-          onError={(preJoinError) => setError(preJoinError.message)}
-        />
-      </main>
+      <MeetingPreJoin
+        roomName={roomName}
+        defaults={{ username: session?.user.name || '', audioEnabled: true, videoEnabled: true }}
+        onSubmit={setUserChoices}
+      />
     );
   }
 

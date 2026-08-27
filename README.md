@@ -1,6 +1,8 @@
 <div align="center">
 
-<h1>🤟 Samjho AI</h1>
+<img src="./public/brand/samjho-ai-mark-transparent.png" alt="Samjho AI logo" width="180" />
+
+<h1>Samjho AI</h1>
 
 <p><strong>Accessible Video Conferencing — Built for Everyone</strong></p>
 

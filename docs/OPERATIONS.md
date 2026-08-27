@@ -1,5 +1,7 @@
 # Operations runbook
 
+> This is the current manual runbook. Unimplemented operational controls and their acceptance criteria are maintained in [`engineering/ISSUE_REGISTER.md`](./engineering/ISSUE_REGISTER.md).
+
 ## Health
 
 - `/health/live`: the Next.js process can answer HTTP.
