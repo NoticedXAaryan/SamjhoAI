@@ -22,6 +22,9 @@ services:
         condition: service_started
     expose:
       - "3000"
+    networks:
+      - default
+      - dokploy-network
 
   postgres:
     image: postgres:17-alpine
@@ -54,8 +57,9 @@ services:
     command: ["--config", "/etc/livekit.yaml"]
     environment:
       LIVEKIT_KEYS: "${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY in Dokploy}: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in Dokploy}"
-    volumes:
-      - ./deploy/livekit.yaml:/etc/livekit.yaml:ro
+    configs:
+      - source: livekit-config
+        target: /etc/livekit.yaml
     depends_on:
       redis:
         condition: service_healthy
@@ -65,6 +69,26 @@ services:
     ports:
       - "7881:7881/tcp"
       - "7882:7882/udp"
+    networks:
+      - default
+      - dokploy-network
 
 volumes:
   postgres-data:
+
+configs:
+  livekit-config:
+    content: |
+      port: 7880
+      log_level: info
+      rtc:
+        tcp_port: 7881
+        udp_port: 7882
+        use_external_ip: true
+      redis:
+        address: redis:6379
+      prometheus_port: 6789
+
+networks:
+  dokploy-network:
+    external: true

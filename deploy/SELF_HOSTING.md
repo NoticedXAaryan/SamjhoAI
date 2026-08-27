@@ -12,7 +12,7 @@ Samjho AI has no required paid API dependency. Authentication and application da
 - `NEXT_PUBLIC_LIVEKIT_URL`: public secure WebSocket endpoint, such as `wss://livekit.example.com`.
 - `LIVEKIT_URL`: server-side HTTPS endpoint for LiveKit administration, normally `https://livekit.example.com`.
 
-Use `docker-compose.yml` as the Compose file in Dokploy. The stack contains the Next.js app, PostgreSQL, Redis, and a pinned LiveKit server. Route the application domain to the `app` service on port `3000` and the LiveKit domain to the `livekit` service on port `7880` with WebSocket support.
+Use `docker-compose.yml` as the Compose file in Dokploy. The stack contains the Next.js app, PostgreSQL, Redis, and a pinned LiveKit server. It joins the public services to Dokploy's external `dokploy-network` and stores the LiveKit configuration as a Compose-managed config, so automatic Git deployments do not depend on repository-relative bind mounts. Route the application domain to the `app` service on port `3000` and the LiveKit domain to the `livekit` service on port `7880` with WebSocket support.
 
 Add every variable listed above to the Dokploy Compose application's **Environment** settings. Repository example files are documentation only and are not loaded automatically by Dokploy. Compose stops immediately with a clear message when a required variable is absent.
 
