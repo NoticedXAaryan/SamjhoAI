@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   useMediaDevices,
   usePreviewTracks,
@@ -70,10 +70,6 @@ export function MeetingPreJoin({ roomName, defaults = {}, onSubmit }: Props) {
     };
   }, [videoEnabled, videoTrack]);
 
-  useEffect(() => {
-    if (tracks?.length) setMediaError('');
-  }, [tracks]);
-
   const normalizedName = username.trim();
   const canJoin = normalizedName.length >= 2 && normalizedName.length <= 80;
   const roomLabel = roomName.replace(/-/g, ' ');
@@ -130,7 +126,10 @@ export function MeetingPreJoin({ roomName, defaults = {}, onSubmit }: Props) {
                 type="button"
                 aria-label={audioEnabled ? 'Turn off microphone' : 'Turn on microphone'}
                 aria-pressed={audioEnabled}
-                onClick={() => setAudioEnabled((enabled) => !enabled)}
+                onClick={() => {
+                  setMediaError('');
+                  setAudioEnabled((enabled) => !enabled);
+                }}
                 className={`flex h-12 w-12 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${
                   audioEnabled
                     ? 'border-white/20 bg-[#3c4043] hover:bg-[#4b4f52]'
@@ -143,7 +142,10 @@ export function MeetingPreJoin({ roomName, defaults = {}, onSubmit }: Props) {
                 type="button"
                 aria-label={videoEnabled ? 'Turn off camera' : 'Turn on camera'}
                 aria-pressed={videoEnabled}
-                onClick={() => setVideoEnabled((enabled) => !enabled)}
+                onClick={() => {
+                  setMediaError('');
+                  setVideoEnabled((enabled) => !enabled);
+                }}
                 className={`flex h-12 w-12 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${
                   videoEnabled
                     ? 'border-white/20 bg-[#3c4043] hover:bg-[#4b4f52]'
@@ -163,7 +165,10 @@ export function MeetingPreJoin({ roomName, defaults = {}, onSubmit }: Props) {
               value={audioDeviceId}
               devices={microphones}
               fallbackLabel="Microphone"
-              onChange={setAudioDeviceId}
+              onChange={(deviceId) => {
+                setMediaError('');
+                setAudioDeviceId(deviceId);
+              }}
             />
             <DeviceSelect
               id="camera-device"
@@ -172,7 +177,10 @@ export function MeetingPreJoin({ roomName, defaults = {}, onSubmit }: Props) {
               value={videoDeviceId}
               devices={cameras}
               fallbackLabel="Camera"
-              onChange={setVideoDeviceId}
+              onChange={(deviceId) => {
+                setMediaError('');
+                setVideoDeviceId(deviceId);
+              }}
             />
           </div>
 
@@ -250,22 +258,25 @@ function DeviceSelect({
 }: {
   id: string;
   label: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   value: string;
   devices: MediaDeviceInfo[];
   fallbackLabel: string;
   onChange: (deviceId: string) => void;
 }) {
+  const selectedDevice = devices.find((device) => device.deviceId === value);
+  const selectedLabel = value === 'default'
+    ? `Default ${fallbackLabel.toLowerCase()}`
+    : selectedDevice
+      ? deviceLabel(selectedDevice, devices.indexOf(selectedDevice), fallbackLabel)
+      : fallbackLabel;
+
   return (
     <label htmlFor={id} className="relative flex items-center gap-3 rounded-2xl border border-white/10 bg-[#15171b] px-4 py-3 text-sm transition focus-within:border-cyan-300/50">
       <span className="text-cyan-300">{icon}</span>
       <span className="min-w-0 flex-1">
         <span className="block text-[11px] font-medium uppercase tracking-[0.12em] text-white/40">{label}</span>
-        <span className="block truncate text-white/80">
-          {value === 'default'
-            ? `Default ${fallbackLabel.toLowerCase()}`
-            : deviceLabel(devices.find((device) => device.deviceId === value) ?? devices[0], 0, fallbackLabel)}
-        </span>
+        <span className="block truncate text-white/80">{selectedLabel}</span>
       </span>
       <select
         id={id}

@@ -1,11 +1,5 @@
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/auth';
-
-export default async function MeetingLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession();
-  if (!session) {
-    redirect('/sign-in');
-  }
-
+export default function MeetingLayout({ children }: { children: React.ReactNode }) {
+  // Meeting links are intentionally public so guests can reach the pre-join screen.
+  // Protected meeting routes (the index and summaries) are enforced by the proxy.
   return children;
 }
