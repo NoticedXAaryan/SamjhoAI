@@ -31,6 +31,8 @@ This recovery replaces the old Clerk-linked `User` shape with Better Auth's self
 1. Configure the variables above in Dokploy before the image build. `NEXT_PUBLIC_LIVEKIT_URL` is embedded in the browser bundle at build time.
 2. Deploy the Compose stack. The application container runs `prisma migrate deploy` before starting Next.js.
 3. Confirm `https://meet.example.com/health/live` and `/health/ready` return HTTP 200.
+
+The Docker image intentionally uses `npm install` instead of `npm ci`. The current dependency graph contains platform-specific transitive packages whose lockfile layout is accepted on Windows but rejected by npm's Linux clean-install validation. Resolving inside the Linux image keeps deployment unblocked; lint, type checking, tests, and lockfile consistency remain CI concerns rather than production-startup gates.
 4. Create one account, start a meeting, and copy its link into a private/incognito browser. Join from the private browser with only a display name. Verify two-way audio/video, screen sharing, guest captions, participant names, guest leave behavior, and host-only meeting end.
 5. End the meeting as the host and confirm the authenticated host can open the transcript while the guest cannot open the protected summary URL.
 
