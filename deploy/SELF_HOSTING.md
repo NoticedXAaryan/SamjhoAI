@@ -10,7 +10,7 @@ Samjho AI has no required paid API dependency. Authentication and application da
 - `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET`: a unique LiveKit key pair. The secret should be at least 32 characters.
 - `NEXT_PUBLIC_LIVEKIT_URL`: public secure WebSocket endpoint, such as `wss://livekit.example.com`.
 
-Use `compose.self-hosted.yml` as the Compose file in Dokploy. Route the application domain to port `3000` and the LiveKit domain to port `7880` with WebSocket support.
+Use `docker-compose.yml` as the Compose file in Dokploy. Route the application domain to port `3000` and the LiveKit domain to port `7880` with WebSocket support.
 
 ## Network requirements
 
