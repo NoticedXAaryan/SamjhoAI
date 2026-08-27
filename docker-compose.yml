@@ -3,18 +3,18 @@ services:
     build:
       context: .
       args:
-        BETTER_AUTH_URL: ${BETTER_AUTH_URL}
-        NEXT_PUBLIC_LIVEKIT_URL: ${NEXT_PUBLIC_LIVEKIT_URL}
+        BETTER_AUTH_URL: ${BETTER_AUTH_URL:?Set BETTER_AUTH_URL in Dokploy}
+        NEXT_PUBLIC_LIVEKIT_URL: ${NEXT_PUBLIC_LIVEKIT_URL:?Set NEXT_PUBLIC_LIVEKIT_URL in Dokploy}
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://samjho:${POSTGRES_PASSWORD}@postgres:5432/samjho
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
-      GUEST_SESSION_SECRET: ${GUEST_SESSION_SECRET:-${BETTER_AUTH_SECRET}}
-      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
-      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
-      LIVEKIT_URL: ${LIVEKIT_URL}
-      NEXT_PUBLIC_LIVEKIT_URL: ${NEXT_PUBLIC_LIVEKIT_URL}
+      DATABASE_URL: postgresql://samjho:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Dokploy}@postgres:5432/samjho
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in Dokploy}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?Set BETTER_AUTH_URL in Dokploy}
+      GUEST_SESSION_SECRET: ${GUEST_SESSION_SECRET:?Set GUEST_SESSION_SECRET in Dokploy}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY in Dokploy}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in Dokploy}
+      LIVEKIT_URL: ${LIVEKIT_URL:?Set LIVEKIT_URL in Dokploy}
+      NEXT_PUBLIC_LIVEKIT_URL: ${NEXT_PUBLIC_LIVEKIT_URL:?Set NEXT_PUBLIC_LIVEKIT_URL in Dokploy}
     depends_on:
       postgres:
         condition: service_healthy
@@ -29,7 +29,7 @@ services:
     environment:
       POSTGRES_DB: samjho
       POSTGRES_USER: samjho
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Dokploy}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -53,7 +53,7 @@ services:
     restart: unless-stopped
     command: ["--config", "/etc/livekit.yaml"]
     environment:
-      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY in Dokploy}: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in Dokploy}"
     volumes:
       - ./deploy/livekit.yaml:/etc/livekit.yaml:ro
     depends_on:

@@ -14,6 +14,8 @@ Samjho AI has no required paid API dependency. Authentication and application da
 
 Use `docker-compose.yml` as the Compose file in Dokploy. The stack contains the Next.js app, PostgreSQL, Redis, and a pinned LiveKit server. Route the application domain to the `app` service on port `3000` and the LiveKit domain to the `livekit` service on port `7880` with WebSocket support.
 
+Add every variable listed above to the Dokploy Compose application's **Environment** settings. Repository example files are documentation only and are not loaded automatically by Dokploy. Compose stops immediately with a clear message when a required variable is absent.
+
 ## Network requirements
 
 The LiveKit signaling endpoint on `7880` can sit behind Dokploy's HTTPS reverse proxy. WebRTC media ports cannot rely on an HTTP reverse proxy: allow inbound TCP `7881` and UDP `7882` directly to the host. For production networks where UDP is restricted, generate LiveKit's full VM configuration with TURN/TLS and a separate TURN domain.
