@@ -7,9 +7,12 @@ const preview = vi.hoisted(() => {
     attach: vi.fn(),
     detach: vi.fn(),
   };
+  const audioTrack = {
+    kind: 'audio',
+  };
   return {
     videoTrack,
-    tracks: [videoTrack],
+    audioTrack,
     usePreviewTracks: vi.fn(),
     useMediaDevices: vi.fn(),
   };
@@ -21,7 +24,7 @@ vi.mock('@livekit/components-react', () => ({
 }));
 
 vi.mock('livekit-client', () => ({
-  Track: { Kind: { Video: 'video' } },
+  Track: { Kind: { Audio: 'audio', Video: 'video' } },
 }));
 
 vi.mock('@/components/brand/BrandLogo', () => ({
@@ -41,7 +44,9 @@ const microphones = [
 
 describe('MeetingPreJoin', () => {
   it('previews media and submits the selected devices and toggles', () => {
-    preview.usePreviewTracks.mockReturnValue(preview.tracks);
+    preview.usePreviewTracks.mockImplementation((options: { audio?: unknown; video?: unknown }) =>
+      options.video ? [preview.videoTrack] : options.audio ? [preview.audioTrack] : [],
+    );
     preview.useMediaDevices.mockImplementation(({ kind }: { kind: MediaDeviceKind }) =>
       kind === 'videoinput' ? cameras : microphones,
     );
@@ -80,7 +85,9 @@ describe('MeetingPreJoin', () => {
   });
 
   it('requires a usable display name before joining', () => {
-    preview.usePreviewTracks.mockReturnValue(preview.tracks);
+    preview.usePreviewTracks.mockImplementation((options: { audio?: unknown; video?: unknown }) =>
+      options.video ? [preview.videoTrack] : options.audio ? [preview.audioTrack] : [],
+    );
     preview.useMediaDevices.mockReturnValue([]);
 
     render(
@@ -96,5 +103,38 @@ describe('MeetingPreJoin', () => {
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'A' } });
     expect(screen.getByText('Enter at least 2 characters.')).toBeTruthy();
     expect(joinButton.disabled).toBe(true);
+  });
+
+  it('keeps a working camera available when no microphone track can be created', () => {
+    preview.usePreviewTracks.mockImplementation((options: { audio?: unknown; video?: unknown }) =>
+      options.video ? [preview.videoTrack] : [],
+    );
+    preview.useMediaDevices.mockImplementation(({ kind }: { kind: MediaDeviceKind }) =>
+      kind === 'videoinput' ? cameras : [],
+    );
+    const onSubmit = vi.fn();
+
+    render(
+      <MeetingPreJoin
+        roomName="abc-defg-hij"
+        defaults={{ username: 'Aaryan', audioEnabled: true, videoEnabled: true }}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Join meeting' }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      audioEnabled: false,
+      videoEnabled: true,
+    }));
+    expect(preview.usePreviewTracks).toHaveBeenCalledWith(
+      expect.objectContaining({ audio: true, video: false }),
+      expect.any(Function),
+    );
+    expect(preview.usePreviewTracks).toHaveBeenCalledWith(
+      expect.objectContaining({ audio: false, video: true }),
+      expect.any(Function),
+    );
   });
 });

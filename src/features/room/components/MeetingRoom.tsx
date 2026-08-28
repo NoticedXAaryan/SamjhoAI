@@ -1,7 +1,7 @@
 'use client';
 
 import '@livekit/components-styles';
-import { useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   LiveKitRoom,
@@ -11,22 +11,22 @@ import {
   Chat,
   type LocalUserChoices,
 } from '@livekit/components-react';
-import { ConnectionState } from 'livekit-client';
+import { ConnectionError, ConnectionState, DisconnectReason, type MediaDeviceFailure } from 'livekit-client';
 import { VideoGrid } from './VideoGrid';
 import { MeetingTopBar } from './MeetingTopBar';
 import { ParticipantSidebar } from './ParticipantSidebar';
 import { ControlBar } from './ControlBar';
 import { AccessibilitySheet } from './AccessibilitySheet';
 import { RealtimeCaptions } from '@/features/captions/components/RealtimeCaptions';
-import { useSpeechToText } from '@/shared/hooks/useSpeechToText';
 import { Button } from '@/components/ui/button';
 import type { AccessibilityPreferences } from '@/shared/lib/types';
+import { cn } from '@/lib/utils';
 
 const defaults: AccessibilityPreferences = {
-  captionsEnabled: true,
+  captionsEnabled: false,
   captionsSize: 'md',
   captionsPosition: 'bottom',
-  gestureDisplayEnabled: true,
+  gestureDisplayEnabled: false,
   highContrast: false,
   preferredLanguage: 'en',
 };
@@ -49,18 +49,93 @@ export function MeetingRoom({ roomName, title, token, serverUrl, userId, userNam
   const [showChat, setShowChat] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [prefs, setPrefs] = useState<AccessibilityPreferences>(defaults);
-  const [disconnected, setDisconnected] = useState(false);
+  const [roomAttempt, setRoomAttempt] = useState(0);
+  const [connectionFailed, setConnectionFailed] = useState(false);
+  const [retryAllowed, setRetryAllowed] = useState(true);
+  const [disconnectMessage, setDisconnectMessage] = useState('');
+  const [mediaWarning, setMediaWarning] = useState('');
+  const everConnected = useRef(false);
+  const intentionalDisconnect = useRef(false);
+  const lastConnectionError = useRef('');
+
+  const audioCapture = useMemo(() => {
+    if (!userChoices.audioEnabled) return false;
+    return userChoices.audioDeviceId && userChoices.audioDeviceId !== 'default'
+      ? { deviceId: userChoices.audioDeviceId }
+      : true;
+  }, [userChoices.audioDeviceId, userChoices.audioEnabled]);
+
+  const videoCapture = useMemo(() => {
+    if (!userChoices.videoEnabled) return false;
+    return userChoices.videoDeviceId && userChoices.videoDeviceId !== 'default'
+      ? { deviceId: userChoices.videoDeviceId }
+      : true;
+  }, [userChoices.videoDeviceId, userChoices.videoEnabled]);
+
+  const handleConnected = useCallback(() => {
+    everConnected.current = true;
+    setConnectionFailed(false);
+    setRetryAllowed(true);
+    setDisconnectMessage('');
+    lastConnectionError.current = '';
+  }, []);
+
+  const handleError = useCallback((error: Error) => {
+    if (error instanceof ConnectionError) {
+      lastConnectionError.current = error.message;
+      return;
+    }
+    setMediaWarning(error.message || 'A camera or microphone could not be started.');
+  }, []);
+
+  const handleDisconnected = useCallback((reason?: DisconnectReason) => {
+    if (intentionalDisconnect.current) return;
+    const roomEnded = reason === DisconnectReason.ROOM_DELETED;
+    setConnectionFailed(true);
+    setRetryAllowed(!roomEnded);
+    setDisconnectMessage(
+      roomEnded
+        ? 'The host ended this meeting.'
+        : everConnected.current
+        ? 'The connection to the meeting was lost. You can retry without creating a new meeting.'
+        : lastConnectionError.current || 'The meeting server could not be reached. Check the LiveKit URL and network access.',
+    );
+  }, []);
+
+  const handleMediaDeviceFailure = useCallback((_failure?: MediaDeviceFailure, kind?: MediaDeviceKind) => {
+    const device = kind === 'videoinput' ? 'camera' : kind === 'audioinput' ? 'microphone' : 'media device';
+    setMediaWarning(`Your ${device} could not be started. Check browser permissions or choose another device in Settings.`);
+  }, []);
+
+  const leaveMeeting = useCallback(() => {
+    intentionalDisconnect.current = true;
+    router.push(returnHref);
+  }, [returnHref, router]);
+
+  const retryConnection = useCallback(() => {
+    everConnected.current = false;
+    intentionalDisconnect.current = false;
+    lastConnectionError.current = '';
+    setConnectionFailed(false);
+    setRetryAllowed(true);
+    setDisconnectMessage('');
+    setRoomAttempt((attempt) => attempt + 1);
+  }, []);
 
   return (
     <LiveKitRoom
+      key={roomAttempt}
       token={token}
       serverUrl={serverUrl}
       connect
-      audio={userChoices.audioEnabled ? { deviceId: userChoices.audioDeviceId } : false}
-      video={userChoices.videoEnabled ? { deviceId: userChoices.videoDeviceId } : false}
-      onConnected={() => setDisconnected(false)}
-      onDisconnected={() => setDisconnected(true)}
-      className="h-screen bg-[#050507] text-white flex flex-col overflow-hidden"
+      audio={audioCapture}
+      video={videoCapture}
+      options={{ adaptiveStream: true, dynacast: true }}
+      onConnected={handleConnected}
+      onDisconnected={handleDisconnected}
+      onError={handleError}
+      onMediaDeviceFailure={handleMediaDeviceFailure}
+      className={cn('flex h-dvh flex-col overflow-hidden bg-[#202124] text-white', prefs.highContrast && 'contrast-125')}
       data-lk-theme="default"
     >
       <RoomAudioRenderer />
@@ -68,12 +143,14 @@ export function MeetingRoom({ roomName, title, token, serverUrl, userId, userNam
       <ConnectionNotice />
       <MeetingTopBar
         title={title}
-        onToggleSidebar={() => { setShowSidebar((v) => !v); setShowChat(false); }}
+        roomName={roomName}
+        onToggleParticipants={() => { setShowSidebar((v) => !v); setShowChat(false); }}
         onToggleChat={() => { setShowChat((v) => !v); setShowSidebar(false); }}
+        onSettingsOpen={() => setShowSettings(true)}
       />
 
-      <div className="flex-1 relative flex overflow-hidden">
-        <div className="flex-1 relative">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        <div className="relative min-w-0 flex-1">
           <VideoGrid />
           <RealtimeCaptions
             enabled={prefs.captionsEnabled}
@@ -83,18 +160,29 @@ export function MeetingRoom({ roomName, title, token, serverUrl, userId, userNam
         </div>
         {showSidebar && <ParticipantSidebar onClose={() => setShowSidebar(false)} />}
         {showChat && (
-          <aside className="w-80 shrink-0 border-l border-white/10 bg-black/70">
+          <aside className="absolute inset-y-2 right-2 z-40 flex w-[min(360px,calc(100vw-16px))] shrink-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#292a2d] shadow-2xl lg:static lg:inset-auto lg:my-2 lg:mr-2">
+            <div className="flex h-12 items-center justify-between border-b border-white/10 px-4">
+              <p className="text-sm font-medium">In-call messages</p>
+              <button type="button" className="text-xs text-white/55 hover:text-white" onClick={() => setShowChat(false)}>Close</button>
+            </div>
             <Chat channelTopic="samjho-chat" />
           </aside>
         )}
-        <SpeechCaptionControl roomName={roomName} userId={userId} userName={userName} />
       </div>
 
       <ControlBar
         roomName={roomName}
+        title={title}
+        userId={userId}
+        userName={userName}
         isHost={isHost}
-        returnHref={returnHref}
+        captionsEnabled={prefs.captionsEnabled}
+        onCaptionsChange={(enabled) => setPrefs((current) => ({ ...current, captionsEnabled: enabled }))}
         onSettingsOpen={() => setShowSettings(true)}
+        onToggleParticipants={() => { setShowSidebar((v) => !v); setShowChat(false); }}
+        onToggleChat={() => { setShowChat((v) => !v); setShowSidebar(false); }}
+        onLeave={leaveMeeting}
+        onEnding={(ending) => { intentionalDisconnect.current = ending; }}
       />
 
       <AccessibilitySheet
@@ -103,37 +191,25 @@ export function MeetingRoom({ roomName, title, token, serverUrl, userId, userNam
         prefs={prefs}
         onChange={setPrefs}
       />
-      {disconnected && (
+      {mediaWarning && !connectionFailed && (
+        <div role="alert" className="absolute left-1/2 top-16 z-[110] flex w-[min(92vw,640px)] -translate-x-1/2 items-center justify-between gap-3 rounded-lg bg-amber-400 px-4 py-2.5 text-sm text-black shadow-xl">
+          <span>{mediaWarning}</span>
+          <button type="button" className="font-semibold" onClick={() => setMediaWarning('')}>Dismiss</button>
+        </div>
+      )}
+      {connectionFailed && (
         <div className="absolute inset-0 z-[120] flex items-center justify-center bg-black/85 p-6 text-center">
-          <div className="max-w-md rounded-2xl border border-white/10 bg-slate-950 p-8">
-            <h2 className="text-xl font-semibold">Meeting disconnected</h2>
-            <p className="mt-2 text-sm text-white/60">The host may have ended the meeting, or the connection could not be restored.</p>
-            <Button className="mt-6" onClick={() => router.push(returnHref)}>Leave meeting</Button>
+          <div className="max-w-md rounded-2xl border border-white/10 bg-[#292a2d] p-8 shadow-2xl">
+            <h2 className="text-xl font-semibold">Couldn’t connect to the meeting</h2>
+            <p className="mt-2 text-sm leading-6 text-white/65">{disconnectMessage}</p>
+            <div className="mt-6 flex justify-center gap-3">
+              {retryAllowed && <Button onClick={retryConnection}>Try again</Button>}
+              <Button variant="secondary" onClick={leaveMeeting}>Leave</Button>
+            </div>
           </div>
         </div>
       )}
     </LiveKitRoom>
-  );
-}
-
-function SpeechCaptionControl({
-  roomName,
-  userId,
-  userName,
-}: Pick<Props, 'roomName' | 'userId' | 'userName'>) {
-  const stt = useSpeechToText(roomName, userId, userName);
-
-  return (
-    <div className="absolute left-4 top-16 z-[80] flex items-center gap-2 rounded-full border border-white/10 bg-black/60 px-3 py-2 backdrop-blur">
-      <span className="text-xs text-white/70">Speech captions</span>
-      <Button
-        size="sm"
-        variant={stt.enabled ? 'secondary' : 'default'}
-        onClick={stt.enabled ? stt.stop : stt.start}
-      >
-        {stt.enabled ? 'Stop' : 'Start'}
-      </Button>
-    </div>
   );
 }
 

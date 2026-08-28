@@ -19,7 +19,7 @@ type SpeechRecognitionConstructor = new () => {
   interimResults: boolean;
   lang: string;
   onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
@@ -36,6 +36,7 @@ export function useSpeechToText(roomName: string, userId: string, userName: stri
   const room = useRoomContext();
   const recognitionRef = useRef<InstanceType<SpeechRecognitionConstructor> | null>(null);
   const [enabled, setEnabled] = useState(false);
+  const [error, setError] = useState('');
 
   const stop = useCallback(() => {
     recognitionRef.current?.stop();
@@ -45,7 +46,12 @@ export function useSpeechToText(roomName: string, userId: string, userName: stri
 
   const start = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
+    if (!SR) {
+      setError('Live speech captions are not supported by this browser.');
+      return;
+    }
+
+    setError('');
 
     const recognition = new SR();
     recognition.continuous = true;
@@ -86,7 +92,12 @@ export function useSpeechToText(roomName: string, userId: string, userName: stri
       }
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event) => {
+      setError(
+        event.error === 'not-allowed'
+          ? 'Speech recognition permission is blocked.'
+          : 'Speech recognition stopped unexpectedly.',
+      );
       stop();
     };
     recognition.onend = () => setEnabled(false);
@@ -98,5 +109,5 @@ export function useSpeechToText(roomName: string, userId: string, userName: stri
 
   useEffect(() => () => stop(), [stop]);
 
-  return { start, stop, enabled };
+  return { start, stop, enabled, error };
 }

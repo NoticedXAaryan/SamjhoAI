@@ -1,5 +1,9 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
+import { useRoomContext } from '@livekit/components-react';
+import { Room, RoomEvent } from 'livekit-client';
+
 import {
   Sheet,
   SheetContent,
@@ -27,18 +31,77 @@ interface Props {
 }
 
 export function AccessibilitySheet({ open, onClose, prefs, onChange }: Props) {
+  const room = useRoomContext();
+  const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const [activeMicrophone, setActiveMicrophone] = useState('default');
+  const [activeCamera, setActiveCamera] = useState('default');
+  const [deviceError, setDeviceError] = useState('');
   const set = <K extends keyof AccessibilityPreferences>(key: K) => (val: AccessibilityPreferences[K]) =>
     onChange({ ...prefs, [key]: val });
+
+  const refreshDevices = useCallback(async () => {
+    try {
+      const devices = await Room.getLocalDevices(undefined, false);
+      setMicrophones(devices.filter((device) => device.kind === 'audioinput'));
+      setCameras(devices.filter((device) => device.kind === 'videoinput'));
+      setActiveMicrophone(room.getActiveDevice('audioinput') || 'default');
+      setActiveCamera(room.getActiveDevice('videoinput') || 'default');
+      setDeviceError('');
+    } catch (error) {
+      setDeviceError(error instanceof Error ? error.message : 'Could not read media devices.');
+    }
+  }, [room]);
+
+  useEffect(() => {
+    if (!open) return;
+    void refreshDevices();
+    room.on(RoomEvent.MediaDevicesChanged, refreshDevices);
+    return () => {
+      room.off(RoomEvent.MediaDevicesChanged, refreshDevices);
+    };
+  }, [open, refreshDevices, room]);
+
+  async function switchDevice(kind: 'audioinput' | 'videoinput', deviceId: string) {
+    setDeviceError('');
+    try {
+      await room.switchActiveDevice(kind, deviceId, false);
+      if (kind === 'audioinput') setActiveMicrophone(deviceId);
+      else setActiveCamera(deviceId);
+    } catch (error) {
+      setDeviceError(error instanceof Error ? error.message : `Could not switch ${kind === 'audioinput' ? 'microphone' : 'camera'}.`);
+    }
+  }
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="w-80 bg-card border-border">
         <SheetHeader>
-          <SheetTitle>Accessibility</SheetTitle>
-          <SheetDescription>Personalise your in-meeting experience.</SheetDescription>
+          <SheetTitle>Meeting settings</SheetTitle>
+          <SheetDescription>Choose your devices and personalise the meeting.</SheetDescription>
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
+          <Section label="Devices">
+            <DeviceRow
+              label="Microphone"
+              value={activeMicrophone}
+              devices={microphones}
+              fallback="Microphone"
+              onChange={(deviceId) => void switchDevice('audioinput', deviceId)}
+            />
+            <DeviceRow
+              label="Camera"
+              value={activeCamera}
+              devices={cameras}
+              fallback="Camera"
+              onChange={(deviceId) => void switchDevice('videoinput', deviceId)}
+            />
+            {deviceError && <p role="alert" className="text-xs text-destructive">{deviceError}</p>}
+          </Section>
+
+          <Separator />
+
           <Section label="Captions">
             <Row label="Enable live captions">
               <Switch
@@ -113,6 +176,40 @@ export function AccessibilitySheet({ open, onClose, prefs, onChange }: Props) {
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function DeviceRow({
+  label,
+  value,
+  devices,
+  fallback,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  devices: MediaDeviceInfo[];
+  fallback: string;
+  onChange: (deviceId: string) => void;
+}) {
+  return (
+    <label className="block space-y-1.5 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+      >
+        <option value="default">Default {fallback.toLowerCase()}</option>
+        {devices
+          .filter((device) => device.deviceId && device.deviceId !== 'default')
+          .map((device, index) => (
+            <option key={device.deviceId} value={device.deviceId}>
+              {device.label || `${fallback} ${index + 1}`}
+            </option>
+          ))}
+      </select>
+    </label>
   );
 }
 

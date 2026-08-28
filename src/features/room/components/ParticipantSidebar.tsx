@@ -8,13 +8,13 @@ export function ParticipantSidebar({ onClose }: { onClose: () => void }) {
   const participants = useParticipants();
 
   return (
-    <aside className="w-72 border-l border-white/10 bg-black/50 backdrop-blur-xl flex flex-col shrink-0">
+    <aside className="absolute inset-y-2 right-2 z-40 flex w-[min(360px,calc(100vw-16px))] shrink-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#292a2d] shadow-2xl lg:static lg:inset-auto lg:my-2 lg:mr-2">
       <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
         <p className="text-sm font-medium text-white/80">
           Participants
           <span className="text-white/50 font-normal ml-1.5">({participants.length})</span>
         </p>
-        <button className="text-xs text-white/50 hover:text-white transition-colors" onClick={onClose}>
+        <button type="button" className="text-xs text-white/50 hover:text-white transition-colors" onClick={onClose}>
           Close
         </button>
       </div>

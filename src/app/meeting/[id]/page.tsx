@@ -1,8 +1,8 @@
 'use client';
 
 import '@livekit/components-styles';
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import type { LocalUserChoices } from '@livekit/components-react';
 import { MeetingRoom as MeetingRoomShell } from '@/features/room/components/MeetingRoom';
@@ -11,6 +11,7 @@ import { useSession } from '@/lib/auth-client';
 
 export default function MeetingPage() {
   const params = useParams();
+  const router = useRouter();
   const roomName = (params.id as string) || 'room';
   const { data: session, isPending } = useSession();
   const [token, setToken] = useState('');
@@ -19,44 +20,57 @@ export default function MeetingPage() {
   const [isHost, setIsHost] = useState(false);
   const [userChoices, setUserChoices] = useState<LocalUserChoices | null>(null);
   const [participant, setParticipant] = useState<{ userId: string; userName: string } | null>(null);
+  const [joining, setJoining] = useState(false);
   const serverUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
-  useEffect(() => {
-    if (isPending || !userChoices) return;
+  async function joinMeeting(choices: LocalUserChoices) {
+    if (joining) return;
+    setJoining(true);
+    setError('');
+    setUserChoices(choices);
+
     if (!serverUrl) {
       setError('LiveKit server URL is not configured. Check NEXT_PUBLIC_LIVEKIT_URL.');
+      setJoining(false);
       return;
     }
 
-    (async () => {
-      try {
-        const resp = await fetch('/api/livekit/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          cache: 'no-store',
-          body: JSON.stringify({ roomName, displayName: userChoices.username }),
-        });
-        const data = await resp.json();
-        if (resp.ok && data.token) {
-          setToken(data.token);
-          setTitle(data.title || roomName);
-          setIsHost(Boolean(data.isHost));
-          setParticipant({ userId: data.userId, userName: data.userName });
-        } else {
-          setError(data.error || 'No token returned from LiveKit token API.');
-        }
-      } catch {
-        setError('Failed to fetch LiveKit token.');
+    try {
+      const response = await fetch('/api/livekit/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ roomName, displayName: choices.username }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.token) {
+        throw new Error(data.error || 'The meeting could not be joined.');
       }
-    })();
-  }, [session, isPending, roomName, serverUrl, userChoices]);
 
-  if (!error && !isPending && !userChoices) {
+      setTitle(data.title || roomName);
+      setIsHost(Boolean(data.isHost));
+      setParticipant({ userId: data.userId, userName: data.userName });
+      setToken(data.token);
+    } catch (joinError) {
+      setError(joinError instanceof Error ? joinError.message : 'Failed to join the meeting.');
+    } finally {
+      setJoining(false);
+    }
+  }
+
+  function resetJoin() {
+    setError('');
+    setToken('');
+    setParticipant(null);
+    setUserChoices(null);
+  }
+
+  if (!error && !isPending && !userChoices && !joining) {
     return (
       <MeetingPreJoin
         roomName={roomName}
         defaults={{ username: session?.user.name || '', audioEnabled: true, videoEnabled: true }}
-        onSubmit={setUserChoices}
+        onSubmit={joinMeeting}
       />
     );
   }
@@ -66,6 +80,10 @@ export default function MeetingPage() {
       <div className="flex h-screen w-full flex-col items-center justify-center bg-[#050507] text-white px-4 text-center">
         <p className="text-lg font-semibold">Unable to join meeting</p>
         <p className="mt-2 max-w-xl text-sm text-white/70">{error}</p>
+        <div className="mt-6 flex gap-3">
+          <button className="rounded-full bg-cyan-300 px-5 py-2.5 text-sm font-semibold text-slate-950" onClick={resetJoin}>Try again</button>
+          <button className="rounded-full border border-white/15 px-5 py-2.5 text-sm font-semibold" onClick={() => router.push(session?.user ? '/dashboard' : '/')}>Leave</button>
+        </div>
       </div>
     );
   }
@@ -79,7 +97,7 @@ export default function MeetingPage() {
     );
   }
 
-  if (token === '' || !participant || !userChoices) {
+  if (joining || token === '' || !participant || !userChoices) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-[#050507] text-white">
         <Loader2 className="mb-4 h-8 w-8 animate-spin text-cyan-400" />

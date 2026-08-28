@@ -6,7 +6,7 @@ import {
   usePreviewTracks,
   type LocalUserChoices,
 } from '@livekit/components-react';
-import { Track, type LocalVideoTrack } from 'livekit-client';
+import { Track, type LocalAudioTrack, type LocalVideoTrack } from 'livekit-client';
 import {
   Camera,
   CameraOff,
@@ -35,31 +35,67 @@ export function MeetingPreJoin({ roomName, defaults = {}, onSubmit }: Props) {
   const [videoEnabled, setVideoEnabled] = useState(defaults.videoEnabled ?? true);
   const [audioDeviceId, setAudioDeviceId] = useState(defaults.audioDeviceId || 'default');
   const [videoDeviceId, setVideoDeviceId] = useState(defaults.videoDeviceId || 'default');
-  const [mediaError, setMediaError] = useState('');
+  const [audioError, setAudioError] = useState('');
+  const [videoError, setVideoError] = useState('');
+  const [environmentError, setEnvironmentError] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const handleMediaError = useCallback((error: Error) => {
-    setMediaError(
+  const describeMediaError = useCallback((error: Error, device: string) => (
       error.name === 'NotAllowedError'
-        ? 'Camera or microphone access was blocked. Allow access in your browser, then try again.'
-        : error.message || 'Your camera or microphone could not be started.',
-    );
+        ? `${device} access is blocked. Allow it in your browser settings and try again.`
+        : error.name === 'NotFoundError'
+          ? `No ${device.toLowerCase()} was found.`
+          : error.name === 'NotReadableError'
+            ? `${device} is already in use by another application.`
+            : error.message || `${device} could not be started.`
+  ), []);
+
+  const handleAudioError = useCallback((error: Error) => {
+    setAudioError(describeMediaError(error, 'Microphone'));
+  }, [describeMediaError]);
+  const handleVideoError = useCallback((error: Error) => {
+    setVideoError(describeMediaError(error, 'Camera'));
+  }, [describeMediaError]);
+
+  useEffect(() => {
+    if (!window.isSecureContext || !navigator.mediaDevices) {
+      setEnvironmentError('Camera and microphone access requires HTTPS or localhost in this browser.');
+    }
   }, []);
 
-  const tracks = usePreviewTracks(
+  const audioTracks = usePreviewTracks(
     {
-      audio: audioEnabled ? { deviceId: audioDeviceId } : false,
-      video: videoEnabled ? { deviceId: videoDeviceId } : false,
+      audio: audioEnabled ? (audioDeviceId === 'default' ? true : { deviceId: audioDeviceId }) : false,
+      video: false,
     },
-    handleMediaError,
+    handleAudioError,
   );
-  const microphones = useMediaDevices({ kind: 'audioinput', onError: handleMediaError });
-  const cameras = useMediaDevices({ kind: 'videoinput', onError: handleMediaError });
+  const videoTracks = usePreviewTracks(
+    {
+      audio: false,
+      video: videoEnabled ? (videoDeviceId === 'default' ? true : { deviceId: videoDeviceId }) : false,
+    },
+    handleVideoError,
+  );
+  const microphones = useMediaDevices({ kind: 'audioinput', onError: handleAudioError });
+  const cameras = useMediaDevices({ kind: 'videoinput', onError: handleVideoError });
 
   const videoTrack = useMemo(
-    () => tracks?.find((track) => track.kind === Track.Kind.Video) as LocalVideoTrack | undefined,
-    [tracks],
+    () => videoTracks?.find((track) => track.kind === Track.Kind.Video) as LocalVideoTrack | undefined,
+    [videoTracks],
   );
+  const audioTrack = useMemo(
+    () => audioTracks?.find((track) => track.kind === Track.Kind.Audio) as LocalAudioTrack | undefined,
+    [audioTracks],
+  );
+
+  useEffect(() => {
+    if (audioTrack) setAudioError('');
+  }, [audioTrack]);
+
+  useEffect(() => {
+    if (videoTrack) setVideoError('');
+  }, [videoTrack]);
 
   useEffect(() => {
     const element = videoRef.current;
@@ -75,8 +111,8 @@ export function MeetingPreJoin({ roomName, defaults = {}, onSubmit }: Props) {
   const roomLabel = roomName.replace(/-/g, ' ');
 
   return (
-    <main className="min-h-screen bg-[#0b0c0f] text-white">
-      <header className="mx-auto flex w-full max-w-[1440px] items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
+    <main className="min-h-dvh bg-[#202124] text-white">
+      <header className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-10">
         <BrandLogo className="w-32 sm:w-36" priority />
         <div className="flex items-center gap-2 text-xs font-medium text-white/55 sm:text-sm">
           <ShieldCheck className="h-4 w-4 text-emerald-400" />
@@ -84,9 +120,9 @@ export function MeetingPreJoin({ roomName, defaults = {}, onSubmit }: Props) {
         </div>
       </header>
 
-      <section className="mx-auto grid min-h-[calc(100vh-88px)] w-full max-w-[1440px] items-center gap-8 px-4 pb-8 sm:px-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-12 lg:px-12">
+      <section className="mx-auto grid min-h-[calc(100dvh-64px)] w-full max-w-[1360px] items-center gap-8 px-4 py-6 sm:px-8 lg:grid-cols-[minmax(0,820px)_360px] lg:justify-center lg:gap-16 lg:px-10">
         <div className="min-w-0">
-          <div className="relative aspect-video overflow-hidden rounded-[28px] border border-white/10 bg-[#202124] shadow-[0_28px_80px_rgba(0,0,0,0.38)]">
+          <div className="relative aspect-video overflow-hidden rounded-2xl border border-white/10 bg-[#111315] shadow-2xl">
             <video
               ref={videoRef}
               autoPlay
@@ -98,20 +134,20 @@ export function MeetingPreJoin({ roomName, defaults = {}, onSubmit }: Props) {
               aria-label="Camera preview"
             />
 
-            {videoEnabled && !videoTrack && !mediaError && (
+            {videoEnabled && !videoTrack && !videoError && !environmentError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/70">
                 <Loader2 className="h-8 w-8 animate-spin" />
                 <p className="text-sm">Starting your camera…</p>
               </div>
             )}
 
-            {(!videoEnabled || mediaError) && (
+            {(!videoEnabled || videoError || environmentError) && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[radial-gradient(circle_at_center,_#2d3035,_#202124_68%)]">
                 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/10">
                   <CameraOff className="h-9 w-9 text-white/65" />
                 </div>
                 <p className="text-sm font-medium text-white/70">
-                  {mediaError ? 'Camera unavailable' : 'Camera is off'}
+                  {!videoEnabled ? 'Camera is off' : 'Camera unavailable'}
                 </p>
               </div>
             )}
@@ -127,7 +163,7 @@ export function MeetingPreJoin({ roomName, defaults = {}, onSubmit }: Props) {
                 aria-label={audioEnabled ? 'Turn off microphone' : 'Turn on microphone'}
                 aria-pressed={audioEnabled}
                 onClick={() => {
-                  setMediaError('');
+                  setAudioError('');
                   setAudioEnabled((enabled) => !enabled);
                 }}
                 className={`flex h-12 w-12 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${
@@ -143,7 +179,7 @@ export function MeetingPreJoin({ roomName, defaults = {}, onSubmit }: Props) {
                 aria-label={videoEnabled ? 'Turn off camera' : 'Turn on camera'}
                 aria-pressed={videoEnabled}
                 onClick={() => {
-                  setMediaError('');
+                  setVideoError('');
                   setVideoEnabled((enabled) => !enabled);
                 }}
                 className={`flex h-12 w-12 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${
@@ -166,7 +202,7 @@ export function MeetingPreJoin({ roomName, defaults = {}, onSubmit }: Props) {
               devices={microphones}
               fallbackLabel="Microphone"
               onChange={(deviceId) => {
-                setMediaError('');
+                setAudioError('');
                 setAudioDeviceId(deviceId);
               }}
             />
@@ -178,37 +214,36 @@ export function MeetingPreJoin({ roomName, defaults = {}, onSubmit }: Props) {
               devices={cameras}
               fallbackLabel="Camera"
               onChange={(deviceId) => {
-                setMediaError('');
+                setVideoError('');
                 setVideoDeviceId(deviceId);
               }}
             />
           </div>
 
-          {mediaError && (
-            <p role="alert" className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-              {mediaError}
-            </p>
+          {(environmentError || videoError || audioError) && (
+            <div role="alert" className="mt-3 space-y-1 rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+              {environmentError && <p>{environmentError}</p>}
+              {videoError && <p>{videoError} You can still join with the camera off.</p>}
+              {audioError && <p>{audioError} You can still join muted.</p>}
+            </div>
           )}
         </div>
 
         <form
-          className="mx-auto w-full max-w-md rounded-[28px] border border-white/10 bg-[#15171b] p-6 shadow-2xl sm:p-8 lg:max-w-none"
+          className="mx-auto w-full max-w-md px-2 py-6 sm:px-6 lg:max-w-none"
           onSubmit={(event) => {
             event.preventDefault();
             if (!canJoin) return;
             onSubmit({
               username: normalizedName,
-              audioEnabled,
-              videoEnabled,
+              audioEnabled: audioEnabled && Boolean(audioTrack),
+              videoEnabled: videoEnabled && Boolean(videoTrack),
               audioDeviceId,
               videoDeviceId,
             });
           }}
         >
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-cyan-300 to-violet-500 text-2xl font-semibold text-slate-950 shadow-[0_0_40px_rgba(34,211,238,0.18)]">
-            {(normalizedName || 'Y').charAt(0).toUpperCase()}
-          </div>
-          <h1 className="text-center text-2xl font-semibold tracking-tight">Ready to join?</h1>
+          <h1 className="text-center text-[28px] font-normal tracking-tight">Ready to join?</h1>
           <p className="mt-2 truncate text-center text-sm capitalize text-white/50">{roomLabel}</p>
 
           <label htmlFor="display-name" className="mt-7 block text-sm font-medium text-white/80">
@@ -232,7 +267,7 @@ export function MeetingPreJoin({ roomName, defaults = {}, onSubmit }: Props) {
           <button
             type="submit"
             disabled={!canJoin}
-            className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-cyan-300 px-5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300/30 disabled:cursor-not-allowed disabled:opacity-40"
+            className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#8ab4f8] px-5 text-sm font-semibold text-[#202124] transition hover:bg-[#aecbfa] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8ab4f8]/30 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Video className="h-4 w-4" />
             Join meeting
