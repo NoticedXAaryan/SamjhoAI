@@ -1,7 +1,7 @@
 'use client';
 
 import '@livekit/components-styles';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   LiveKitRoom,
@@ -18,18 +18,14 @@ import { ParticipantSidebar } from './ParticipantSidebar';
 import { ControlBar } from './ControlBar';
 import { AccessibilitySheet } from './AccessibilitySheet';
 import { RealtimeCaptions } from '@/features/captions/components/RealtimeCaptions';
+import { GestureCaptions } from '@/features/captions/components/GestureCaptions';
 import { Button } from '@/components/ui/button';
-import type { AccessibilityPreferences } from '@/shared/lib/types';
+import {
+  ACCESSIBILITY_STORAGE_KEY,
+  defaultAccessibilityPreferences,
+  parseAccessibilityPreferences,
+} from '@/features/room/accessibility-preferences';
 import { cn } from '@/lib/utils';
-
-const defaults: AccessibilityPreferences = {
-  captionsEnabled: false,
-  captionsSize: 'md',
-  captionsPosition: 'bottom',
-  gestureDisplayEnabled: false,
-  highContrast: false,
-  preferredLanguage: 'en',
-};
 
 interface Props {
   roomName: string;
@@ -48,7 +44,8 @@ export function MeetingRoom({ roomName, title, token, serverUrl, userId, userNam
   const [showSidebar, setShowSidebar] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [prefs, setPrefs] = useState<AccessibilityPreferences>(defaults);
+  const [prefs, setPrefs] = useState(defaultAccessibilityPreferences);
+  const [prefsReady, setPrefsReady] = useState(false);
   const [roomAttempt, setRoomAttempt] = useState(0);
   const [connectionFailed, setConnectionFailed] = useState(false);
   const [retryAllowed, setRetryAllowed] = useState(true);
@@ -107,6 +104,18 @@ export function MeetingRoom({ roomName, title, token, serverUrl, userId, userNam
     setMediaWarning(`Your ${device} could not be started. Check browser permissions or choose another device in Settings.`);
   }, []);
 
+  useEffect(() => {
+    setPrefs(parseAccessibilityPreferences(window.localStorage.getItem(ACCESSIBILITY_STORAGE_KEY)));
+    setPrefsReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!prefsReady) return;
+    window.localStorage.setItem(ACCESSIBILITY_STORAGE_KEY, JSON.stringify(prefs));
+    document.documentElement.classList.toggle('samjho-high-contrast', prefs.highContrast);
+    return () => document.documentElement.classList.remove('samjho-high-contrast');
+  }, [prefs, prefsReady]);
+
   const leaveMeeting = useCallback(() => {
     intentionalDisconnect.current = true;
     router.push(returnHref);
@@ -135,7 +144,7 @@ export function MeetingRoom({ roomName, title, token, serverUrl, userId, userNam
       onDisconnected={handleDisconnected}
       onError={handleError}
       onMediaDeviceFailure={handleMediaDeviceFailure}
-      className={cn('flex h-dvh flex-col overflow-hidden bg-[#202124] text-white', prefs.highContrast && 'contrast-125')}
+      className={cn('flex h-dvh flex-col overflow-hidden bg-[#202124] text-white', prefs.highContrast && 'samjho-high-contrast')}
       data-lk-theme="default"
     >
       <RoomAudioRenderer />
@@ -157,6 +166,13 @@ export function MeetingRoom({ roomName, title, token, serverUrl, userId, userNam
             size={prefs.captionsSize}
             position={prefs.captionsPosition}
           />
+          <GestureCaptions
+            enabled={prefs.gestureDisplayEnabled}
+            roomName={roomName}
+            userId={userId}
+            userName={userName}
+            language={prefs.preferredLanguage}
+          />
         </div>
         {showSidebar && <ParticipantSidebar onClose={() => setShowSidebar(false)} />}
         {showChat && (
@@ -177,7 +193,10 @@ export function MeetingRoom({ roomName, title, token, serverUrl, userId, userNam
         userName={userName}
         isHost={isHost}
         captionsEnabled={prefs.captionsEnabled}
+        captionLanguage={prefs.preferredLanguage}
+        gesturesEnabled={prefs.gestureDisplayEnabled}
         onCaptionsChange={(enabled) => setPrefs((current) => ({ ...current, captionsEnabled: enabled }))}
+        onGesturesChange={(enabled) => setPrefs((current) => ({ ...current, gestureDisplayEnabled: enabled }))}
         onSettingsOpen={() => setShowSettings(true)}
         onToggleParticipants={() => { setShowSidebar((v) => !v); setShowChat(false); }}
         onToggleChat={() => { setShowChat((v) => !v); setShowSidebar(false); }}

@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { useLocalParticipant, useParticipants } from '@livekit/components-react';
 import {
   Captions,
+  Hand,
   LogOut,
   MessageSquare,
   Mic,
@@ -44,7 +45,10 @@ interface Props {
   userName: string;
   isHost: boolean;
   captionsEnabled: boolean;
+  captionLanguage: string;
+  gesturesEnabled: boolean;
   onCaptionsChange: (enabled: boolean) => void;
+  onGesturesChange: (enabled: boolean) => void;
   onSettingsOpen: () => void;
   onToggleParticipants: () => void;
   onToggleChat: () => void;
@@ -61,7 +65,10 @@ export function ControlBar({
   userName,
   isHost,
   captionsEnabled,
+  captionLanguage,
+  gesturesEnabled,
   onCaptionsChange,
+  onGesturesChange,
   onSettingsOpen,
   onToggleParticipants,
   onToggleChat,
@@ -70,7 +77,7 @@ export function ControlBar({
 }: Props) {
   const participants = useParticipants();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
-  const captions = useSpeechToText(roomName, userId, userName);
+  const captions = useSpeechToText(roomName, userId, userName, captionLanguage, captionsEnabled);
   const [ending, setEnding] = useState(false);
   const [pendingAction, setPendingAction] = useState<MediaAction>(null);
   const [mediaError, setMediaError] = useState('');
@@ -94,10 +101,7 @@ export function ControlBar({
   }
 
   function toggleCaptions() {
-    const nextEnabled = !captionsEnabled;
-    onCaptionsChange(nextEnabled);
-    if (nextEnabled) captions.start();
-    else captions.stop();
+    onCaptionsChange(!captionsEnabled);
   }
 
   async function handleEnd() {
@@ -148,6 +152,14 @@ export function ControlBar({
             onClick={toggleCaptions}
           >
             <Captions />
+          </ControlButton>
+          <ControlButton
+            label={gesturesEnabled ? 'Turn off hand signs' : 'Turn on hand signs'}
+            active={gesturesEnabled}
+            pressed={gesturesEnabled}
+            onClick={() => onGesturesChange(!gesturesEnabled)}
+          >
+            <Hand />
           </ControlButton>
           <ControlButton
             label={isScreenShareEnabled ? 'Stop presenting' : 'Present now'}
@@ -201,10 +213,20 @@ export function ControlBar({
           )}
         </div>
 
-        {(mediaError || captions.error) && (
-          <p role="alert" className="absolute bottom-[calc(100%+8px)] left-1/2 w-[min(92vw,560px)] -translate-x-1/2 rounded-lg bg-red-600 px-4 py-2.5 text-center text-sm text-white shadow-xl">
-            {mediaError || captions.error}
-          </p>
+        {(mediaError || captions.error || captions.storageError) && (
+          <div className="absolute bottom-[calc(100%+8px)] left-1/2 flex w-[min(92vw,560px)] -translate-x-1/2 flex-col gap-2">
+            {(mediaError || captions.error) && (
+              <p role="alert" className="rounded-lg bg-red-600 px-4 py-2.5 text-center text-sm text-white shadow-xl">
+                {mediaError || captions.error}
+              </p>
+            )}
+            {captions.storageError && (
+              <p role="alert" className="flex items-center justify-between gap-3 rounded-lg bg-amber-400 px-4 py-2.5 text-sm text-black shadow-xl">
+                <span>{captions.storageError}</span>
+                <button type="button" className="font-semibold" onClick={captions.clearStorageError}>Dismiss</button>
+              </p>
+            )}
+          </div>
         )}
       </footer>
     </TooltipProvider>

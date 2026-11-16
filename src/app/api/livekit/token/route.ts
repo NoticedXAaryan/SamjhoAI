@@ -1,9 +1,10 @@
+import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { PrismaMeetingRepository } from '@/features/meetings/meetings.repository';
 import { MeetingService } from '@/features/meetings/meetings.service';
 import { GuestDisplayNameSchema, RoomNameSchema } from '@/shared/lib/validation';
-import { createGuestSession, getGuestSession } from '@/features/auth/guest-session';
+import { GUEST_COOKIE_NAME, getGuestSession, upsertGuestSession } from '@/features/auth/guest-session';
 import { createLiveKitParticipantToken } from '@/infrastructure/livekit/livekit.gateway';
 
 export const dynamic = 'force-dynamic';
@@ -30,8 +31,13 @@ export async function POST(req: NextRequest) {
 
     const meeting = await new MeetingService(new PrismaMeetingRepository()).validateAndJoin(room);
     const existingGuest = authenticatedUser ? null : await getGuestSession(room);
+    const existingCookie = authenticatedUser ? undefined : (await cookies()).get(GUEST_COOKIE_NAME)?.value;
     const createdGuest = !authenticatedUser && existingGuest?.displayName !== parsedGuestName.data
-      ? createGuestSession(room, parsedGuestName.data!)
+      ? upsertGuestSession({
+          existingValue: existingCookie,
+          roomName: room,
+          displayName: parsedGuestName.data!,
+        })
       : null;
     const guestSession = existingGuest?.displayName === parsedGuestName.data
       ? existingGuest

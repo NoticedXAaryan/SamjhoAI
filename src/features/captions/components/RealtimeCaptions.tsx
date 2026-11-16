@@ -68,6 +68,7 @@ export function RealtimeCaptions({ enabled = true, size = 'md', position = 'bott
 
   return (
     <div
+      data-captions
       className={cn(
         'absolute left-4 right-4 z-20 space-y-1.5 pointer-events-none',
         position === 'bottom' ? 'bottom-20' : 'top-16'
@@ -80,8 +81,8 @@ export function RealtimeCaptions({ enabled = true, size = 'md', position = 'bott
         >
           <p className="text-xs text-white/50 mb-0.5">{c.userName}</p>
           <p className={cn('text-white font-medium', sizeClass[size])}>{c.content}</p>
-          {c.gestureType && (
-            <p className="text-xs text-cyan-400 mt-0.5">🤟 {c.gestureType}</p>
+          {c.type === 'gesture' && (
+            <p className="text-xs text-cyan-300 mt-0.5">Hand sign</p>
           )}
         </div>
       ))}

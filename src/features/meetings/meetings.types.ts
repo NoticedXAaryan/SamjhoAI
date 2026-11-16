@@ -15,6 +15,7 @@ export interface Meeting {
 export interface CreateMeetingInput {
   title?: string;
   organizerId: string;
+  startsAt?: Date;
 }
 
 // Re-export from shared to maintain backward compatibility
@@ -31,7 +32,7 @@ export interface IMeetingRepository {
 }
 
 export interface IMeetingService {
-  createMeeting(title: string | undefined, userId: string): Promise<{ roomName: string }>;
+  createMeeting(title: string | undefined, userId: string, startsAt?: Date): Promise<{ roomName: string }>;
   validateAndJoin(roomName: string): Promise<{ roomName: string; title: string; organizerId: string }>;
   getUpcoming(userId: string): Promise<Meeting[]>;
   getPast(userId: string): Promise<Meeting[]>;

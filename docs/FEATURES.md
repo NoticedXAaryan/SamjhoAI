@@ -12,14 +12,19 @@ This document separates verified baseline behavior from planned work. Marketing 
 - Room-scoped signed guest sessions without fake account records.
 - LiveKit pre-join device selection, multi-party audio/video, screen sharing, remote audio, participant list, and chat.
 - Host deletion of the LiveKit room when ending a meeting.
-- Browser speech recognition, realtime caption broadcast, and PostgreSQL transcript persistence for accounts and guests.
+- Browser speech recognition in English, Spanish, French, German, Hindi, or Japanese, realtime caption broadcast, and PostgreSQL transcript persistence for accounts and guests.
+- Camera hand signs from a fixed set (Hello, Please wait, Look here, Yes, No, Peace, I love you), shared live and saved on the transcript. This is not full conversational sign language.
 - Host-only transcript summary and text download.
+- Instant meetings and scheduled meetings with a title and start time.
+- Accessibility choices for caption size, caption position, high contrast, speech language, and hand signs, remembered in the browser.
 - Liveness and database readiness endpoints.
 - Docker/Dokploy stack for the app, PostgreSQL, Redis, and LiveKit.
 
 ## Baseline limitations
 
-- Browser speech recognition availability and accuracy vary by browser and operating system.
+- Browser speech recognition availability and accuracy vary by browser and operating system. Chrome and Edge are the reliable caption browsers.
+- Hand signs need the camera and recognize only the fixed set above. Lighting, distance, and which hand is visible change accuracy.
+- Cross-language translation of captions is not included. The language control selects the speech-recognition language.
 - The checked-in LiveKit setup exposes direct TCP/UDP media but does not yet configure TURN/TLS for the most restrictive corporate networks.
 - Rate limiting is process-local; multiple app replicas require a shared limiter.
 - Guest admission is link-based; a host-controlled waiting room and meeting passcode are not yet implemented.
