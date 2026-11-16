@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install --yes --no-install-recommends openssl \
 RUN npm install --global npm@10.9.8
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
-RUN npm install --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 
 FROM dependencies AS builder
 ARG BETTER_AUTH_URL
@@ -31,7 +31,7 @@ RUN apt-get update && apt-get install --yes --no-install-recommends openssl \
 RUN npm install --global npm@10.9.8
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
-RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public

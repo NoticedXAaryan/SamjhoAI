@@ -17,19 +17,22 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - run: npm ci
+      - name: Use the npm version declared by the repository
+        run: corepack enable && corepack prepare npm@10.9.8 --activate && corepack npm --version
+
+      - run: corepack npm ci
 
       - name: Lint
-        run: npm run lint
+        run: corepack npm run lint
 
       - name: Type check
-        run: npm run typecheck
+        run: corepack npm run typecheck
 
       - name: Unit tests with coverage
-        run: npx vitest run --coverage
+        run: corepack npm exec vitest run --coverage
 
       - name: Build
-        run: npm run build
+        run: corepack npm run build
         env:
           BETTER_AUTH_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
           GUEST_SESSION_SECRET: ci-only-guest-secret-0123456789abcdef0123456789
