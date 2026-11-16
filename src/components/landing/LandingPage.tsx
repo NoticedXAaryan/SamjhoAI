@@ -58,9 +58,9 @@ const DynamicIslandNav = memo(() => {
                   exit={{ opacity: 0, width: 0 }}
                   className="flex items-center gap-6 px-4 text-sm font-medium text-white/70 whitespace-nowrap overflow-hidden"
                 >
-                  <a href="#" className="hover:text-white transition-colors">Product</a>
-                  <a href="#" className="hover:text-white transition-colors">Technology</a>
-                  <a href="#" className="hover:text-white transition-colors">Enterprise</a>
+                  <a href="#product" className="hover:text-white transition-colors">Product</a>
+                  <a href="#access" className="hover:text-white transition-colors">Access</a>
+                  <a href="#start" className="hover:text-white transition-colors">Start</a>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -479,12 +479,11 @@ export default function LandingPage() {
   const textY = useTransform(heroProgress, [0, 0.15], [0, -50]);
 
   useEffect(() => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? '';
     const controller = new AbortController();
 
     const warmup = async () => {
       try {
-        await fetch(`${apiBase}/health/ready`, {
+        await fetch('/health/live', {
           method: 'GET',
           cache: 'no-store',
           credentials: 'include',
@@ -650,7 +649,7 @@ export default function LandingPage() {
       </section>
 
       {/* Highlights / Bento Grid */}
-      <section className="py-16 sm:py-24 px-4 sm:px-6 max-w-[1000px] mx-auto">
+      <section id="product" className="py-16 sm:py-24 px-4 sm:px-6 max-w-[1000px] mx-auto">
         <div className="mb-12 sm:mb-16">
           <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tighter text-white">
             Get the highlights.
@@ -765,7 +764,7 @@ export default function LandingPage() {
       </section>
 
       {/* Technology Section */}
-      <section className="py-16 sm:py-24 px-4 sm:px-6 max-w-[1000px] mx-auto border-t border-white/10">
+      <section id="access" className="py-16 sm:py-24 px-4 sm:px-6 max-w-[1000px] mx-auto border-t border-white/10">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -873,7 +872,7 @@ export default function LandingPage() {
       </section>
 
       {/* Pre-Footer CTA */}
-      <section className="border-t border-white/10 bg-[#080809] px-4 py-16 sm:px-6 sm:py-24">
+      <section id="start" className="border-t border-white/10 bg-[#080809] px-4 py-16 sm:px-6 sm:py-24">
         <motion.div
           initial={{ opacity: 0, y: 18 }}
           whileInView={{ opacity: 1, y: 0 }}

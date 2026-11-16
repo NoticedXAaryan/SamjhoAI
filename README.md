@@ -6,7 +6,7 @@
 
 <p><strong>Accessible Video Conferencing — Built for Everyone</strong></p>
 
-<p>Self-hosted video meetings · Realtime captions · Chat and transcripts</p>
+<p>Self-hosted video meetings · Realtime captions · Hand signs · Chat and transcripts</p>
 
 <br/>
 
@@ -24,14 +24,21 @@
 
 Our goal is to build a highly usable, real-world ready system that makes communication seamless across different abilities.
 
+<p align="center">
+  <img src="./docs/images/home.png" alt="Samjho AI home page" width="860" />
+</p>
+<p align="center">
+  <img src="./docs/images/sign-in.png" alt="Samjho AI sign-in screen" width="860" />
+</p>
+
 | Feature | Description |
 |---|---|
-| 📝 **Live captions** | Browser speech recognition, reliable in-room caption broadcast, and host transcript export |
+| 📝 **Live captions** | Browser speech recognition in six languages, in-room broadcast, and host transcript export |
 | 🎥 **Video meetings** | Prejoin preview, mic, camera, screen share, remote audio, grid layouts, chat, and participant list |
 | 🔐 **Self-hosted auth** | Better Auth email/password accounts and sessions stored in PostgreSQL |
-| 🔗 **Guest joining** | Participants can join a valid meeting link with a display name and no account |
-| 🤟 **Sign recognition** | Planned; the current release does not claim an implemented gesture-recognition model |
-| 🌐 **Translation** | Planned after the reliable meeting baseline is complete |
+| 🔗 **Guest joining** | Participants can join a valid meeting link with a display name and no account. A guest can keep a separate session for more than one room |
+| 🤟 **Hand signs** | Camera recognition of Hello, Please wait, Look here, Yes, No, Peace, and I love you. Shared live and saved on the transcript |
+| 📅 **Scheduling** | Start a meeting now or schedule one with a title and start time |
 
 ---
 
@@ -56,8 +63,9 @@ Samjho AI is a unified **Next.js App Router** application designed for a self-ho
 - **Auth**: Better Auth sign-up/sign-in/sign-out
 - **Meetings**: Authenticated meeting creation plus signed, room-scoped guest joining
 - **Meeting room**: Prejoin device selection, LiveKit grid, remote audio, mic/cam/screen share controls, reconnection state, chat, and participants sidebar
-- **Realtime captions**: Reliable, validated, topic-scoped LiveKit data messages plus transcript persistence
-- **Summary**: `/meeting/[id]/summary` shows transcript and downloads `.txt`
+- **Realtime captions**: Reliable, validated, topic-scoped LiveKit data messages plus transcript persistence. The speech language follows the meeting setting.
+- **Hand signs**: A fixed, on-device gesture set is recognized from the camera and broadcast with the captions.
+- **Summary**: `/meeting/[id]/summary` shows speech and hand signs, and downloads `.txt`
 
 For verified behavior and remaining limitations, see [`docs/FEATURES.md`](./docs/FEATURES.md).
 
@@ -130,6 +138,8 @@ npx prisma migrate deploy
 npm run dev
 ```
 Open **[http://localhost:3000](http://localhost:3000)**
+
+Hand signs run in the browser from files shipped with this repository. They do not need a model API key. Live captions use the browser's speech recognition, which is reliable in Chrome and Edge. A real meeting still needs the PostgreSQL database and a LiveKit server from the environment above. Password reset email and spoken-language translation are not part of this build.
 
 ---
 

@@ -60,8 +60,8 @@ export default async function SummaryPage({ params }: { params: Promise<{ id: st
                     </p>
                   </div>
                   <p className="mt-1 text-sm text-white/80 whitespace-pre-wrap">{s.content}</p>
-                  {s.gestureType && (
-                    <p className="text-xs text-cyan-400 mt-1">🤟 {s.gestureType}</p>
+                  {s.type === 'gesture' && (
+                    <p className="text-xs text-cyan-400 mt-1">Hand sign</p>
                   )}
                 </div>
               ))

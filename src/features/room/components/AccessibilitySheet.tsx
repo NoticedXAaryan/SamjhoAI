@@ -22,6 +22,8 @@ import {
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import type { AccessibilityPreferences } from '@/shared/lib/types';
+import { handSignVocabulary } from '@/features/captions/gesture-phrases';
+import { SPEECH_LANGUAGES } from '@/features/captions/speech-locales';
 
 interface Props {
   open: boolean;
@@ -138,13 +140,17 @@ export function AccessibilitySheet({ open, onClose, prefs, onChange }: Props) {
 
           <Separator />
 
-          <Section label="Gestures">
-            <Row label="Show gesture recognition">
+          <Section label="Hand signs">
+            <Row label="Share hand signs">
               <Switch
                 checked={prefs.gestureDisplayEnabled}
                 onCheckedChange={set('gestureDisplayEnabled')}
               />
             </Row>
+            <p className="text-xs leading-5 text-muted-foreground">
+              With your camera on, these signs are shown to everyone and saved in the transcript: {handSignVocabulary().join(', ')}.
+              This is a fixed sign set, not full conversational sign language.
+            </p>
           </Section>
 
           <Separator />
@@ -162,14 +168,7 @@ export function AccessibilitySheet({ open, onClose, prefs, onChange }: Props) {
               <Pick
                 value={prefs.preferredLanguage}
                 onChange={set('preferredLanguage')}
-                options={[
-                  ['en', 'English'],
-                  ['es', 'Spanish'],
-                  ['fr', 'French'],
-                  ['de', 'German'],
-                  ['hi', 'Hindi'],
-                  ['ja', 'Japanese'],
-                ]}
+                options={SPEECH_LANGUAGES.map((language) => [language.code, language.label])}
               />
             </Row>
           </Section>

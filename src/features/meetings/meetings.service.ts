@@ -7,8 +7,12 @@ import type { IMeetingRepository, IMeetingService, Meeting } from './meetings.ty
 export class MeetingService implements IMeetingService {
   constructor(private readonly repo: IMeetingRepository) {}
 
-  async createMeeting(title: string | undefined, userId: string) {
-    return this.repo.create({ title, organizerId: userId });
+  async createMeeting(title: string | undefined, userId: string, startsAt?: Date) {
+    return this.repo.create({
+      title,
+      organizerId: userId,
+      ...(startsAt ? { startsAt } : {}),
+    });
   }
 
   async validateAndJoin(roomName: string) {

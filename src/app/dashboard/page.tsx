@@ -16,22 +16,33 @@ export default function DashboardPage() {
   const [upcoming, setUpcoming] = useState<Meeting[]>([]);
   const [past, setPast] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (isPending || !session?.user) return;
+    let cancelled = false;
     (async () => {
       try {
         setLoading(true);
+        setLoadError('');
         const [up, pa] = await Promise.all([getUpcomingMeetings(), getPastMeetings()]);
+        if (cancelled) return;
         setUpcoming(up);
         setPast(pa);
-      } catch {
-        // Silently handle — user sees empty state
+      } catch (error) {
+        if (cancelled) return;
+        setUpcoming([]);
+        setPast([]);
+        setLoadError(error instanceof Error ? error.message : 'Meetings could not be loaded.');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, [isPending, session]);
+    return () => {
+      cancelled = true;
+    };
+  }, [isPending, session, reloadKey]);
 
   if (isPending) {
     return (
@@ -49,6 +60,19 @@ export default function DashboardPage() {
 
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 space-y-10">
         <HeroCard />
+
+        {loadError && (
+          <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-red-400/30 bg-red-500/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-red-100">{loadError}</p>
+            <button
+              type="button"
+              className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black"
+              onClick={() => setReloadKey((value) => value + 1)}
+            >
+              Try again
+            </button>
+          </div>
+        )}
 
         {/* Upcoming Meetings */}
         <section>

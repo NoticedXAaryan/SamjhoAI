@@ -23,7 +23,7 @@ export class PrismaMeetingRepository implements IMeetingRepository {
       data: {
         roomName,
         title: formatTitle(input.title),
-        startsAt: new Date(),
+        startsAt: input.startsAt ?? new Date(),
         status: 'scheduled',
         organizerId: input.organizerId,
       },
@@ -54,7 +54,7 @@ export class PrismaMeetingRepository implements IMeetingRepository {
         organizerId: userId,
         status: { not: 'ended' },
       },
-      orderBy: { startsAt: 'desc' },
+      orderBy: { startsAt: 'asc' },
       take: 20,
     });
     return docs.map(d => ({
@@ -93,7 +93,7 @@ export class PrismaMeetingRepository implements IMeetingRepository {
   async markActive(roomName: string): Promise<void> {
     await prisma.meeting.update({
       where: { roomName },
-      data: { status: 'active', startsAt: new Date() },
+      data: { status: 'active' },
     });
   }
 

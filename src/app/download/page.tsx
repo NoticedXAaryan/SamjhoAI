@@ -5,19 +5,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 const options = [
   {
-    title: 'Web App',
-    description: 'Use Samjho AI in your browser with no installation.',
+    title: 'Web app',
+    description: 'Join from the browser. No install, and guests can enter with a display name.',
     icon: Laptop,
     action: 'Open dashboard',
     href: '/dashboard',
     recommended: true,
   },
   {
-    title: 'Desktop Package',
-    description: 'Archived Electron packaging can be restored from the legacy folder.',
+    title: 'Your own server',
+    description: 'Run the Next.js app, PostgreSQL, and LiveKit with the Docker Compose stack in this repository.',
     icon: MonitorDown,
-    action: 'View archive',
-    href: '/dashboard',
+    action: 'Back to home',
+    href: '/',
     recommended: false,
   },
 ];
@@ -38,7 +38,7 @@ export default function DownloadPage() {
           </Badge>
           <h1 className="max-w-3xl text-4xl font-semibold tracking-normal sm:text-6xl">Choose how you want to run Samjho AI.</h1>
           <p className="mt-5 max-w-2xl text-lg text-white/55">
-            The browser app is now the primary experience. Legacy desktop and backend pieces are archived inside the project for later recovery.
+            Samjho AI runs in the browser. Captions, hand signs, and the meeting room do not need a desktop install.
           </p>
         </section>
 
@@ -75,22 +75,22 @@ export default function DownloadPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-cyan-glow" />
-              Preserved systems
+              What is ready
             </CardTitle>
-            <CardDescription>The JWT auth backend, Prisma schema, and old Vite app are saved under `archive/`.</CardDescription>
+            <CardDescription>Accounts, guest links, live captions, and a fixed set of hand signs all run in this app.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm text-white/70 sm:grid-cols-3">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-              Self-hosted authentication is active
+              Email and password accounts
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-              Landing UI retained
+              Captions and transcript download
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-              Legacy code archived
+              Camera hand signs in the room
             </div>
           </CardContent>
         </Card>

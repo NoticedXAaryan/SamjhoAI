@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   MeetingTitleSchema,
+  MeetingStartSchema,
   RoomNameSchema,
   GuestDisplayNameSchema,
   CaptionSegmentSchema,
@@ -23,6 +24,15 @@ describe('MeetingTitleSchema', () => {
 
   it('rejects title longer than 100 characters', () => {
     expect(MeetingTitleSchema.safeParse('x'.repeat(101)).success).toBe(false);
+  });
+});
+
+describe('MeetingStartSchema', () => {
+  it('accepts a start time later today and rejects the distant past', () => {
+    const soon = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    expect(MeetingStartSchema.safeParse(soon).success).toBe(true);
+    expect(MeetingStartSchema.safeParse('2020-01-01T00:00:00.000Z').success).toBe(false);
+    expect(MeetingStartSchema.safeParse('tomorrow').success).toBe(false);
   });
 });
 

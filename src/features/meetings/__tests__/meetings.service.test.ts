@@ -48,6 +48,16 @@ describe('MeetingService', () => {
       });
     });
 
+    it('keeps a future start time when one is provided', async () => {
+      const startsAt = new Date('2026-12-01T15:00:00.000Z');
+      await service.createMeeting('Planning', 'user-1', startsAt);
+      expect(repo.create).toHaveBeenCalledWith({
+        title: 'Planning',
+        organizerId: 'user-1',
+        startsAt,
+      });
+    });
+
     it('creates a meeting with undefined title', async () => {
       const result = await service.createMeeting(undefined, 'user-1');
       expect(result.roomName).toBe('new-room-id');

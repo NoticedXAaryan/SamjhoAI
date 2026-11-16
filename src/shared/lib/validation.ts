@@ -4,6 +4,12 @@ import { z } from 'zod';
 
 export const MeetingTitleSchema = z.string().min(1).max(100).optional();
 
+export const MeetingStartSchema = z.iso.datetime().refine((value) => {
+  const time = new Date(value).getTime();
+  const now = Date.now();
+  return time >= now - 2 * 60 * 1000 && time <= now + 366 * 24 * 60 * 60 * 1000;
+}, 'Choose a start time from now through the next year.');
+
 export const RoomNameSchema = z
   .string()
   .min(1)

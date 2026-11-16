@@ -5,7 +5,7 @@
 'use server';
 
 import { getSession } from '@/lib/auth';
-import { validate, MeetingTitleSchema, RoomNameSchema } from '@/shared/lib/validation';
+import { validate, MeetingStartSchema, MeetingTitleSchema, RoomNameSchema } from '@/shared/lib/validation';
 import { PrismaMeetingRepository } from './meetings.repository';
 import { MeetingService } from './meetings.service';
 import { deleteLiveKitRoom } from '@/infrastructure/livekit/livekit.gateway';
@@ -20,10 +20,11 @@ function makeService() {
   return new MeetingService(new PrismaMeetingRepository());
 }
 
-export async function createMeeting(rawTitle?: string) {
-  const title = validate(MeetingTitleSchema, rawTitle);
+export async function createMeeting(rawTitle?: string, rawStartsAt?: string) {
+  const title = validate(MeetingTitleSchema, rawTitle?.trim() ? rawTitle.trim() : undefined);
+  const startsAt = rawStartsAt ? new Date(validate(MeetingStartSchema, rawStartsAt)) : undefined;
   const userId = await requireUserId();
-  return makeService().createMeeting(title, userId);
+  return makeService().createMeeting(title, userId, startsAt);
 }
 
 export async function validateAndJoinMeeting(rawRoomName: string) {

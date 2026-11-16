@@ -39,6 +39,26 @@
     @apply min-h-screen bg-background text-foreground font-sans antialiased overflow-x-hidden;
     letter-spacing: 0;
   }
+
+  html.samjho-high-contrast,
+  html.samjho-high-contrast body {
+    background: #000;
+    color: #fff;
+  }
+
+  html.samjho-high-contrast :focus-visible {
+    outline: 3px solid #ffe14a;
+    outline-offset: 2px;
+  }
+
+  html.samjho-high-contrast [data-captions] p {
+    color: #fff;
+  }
+
+  html.samjho-high-contrast [data-captions] > div {
+    background: #000;
+    border: 2px solid #ffe14a;
+  }
 }
 
 @layer utilities {
